@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>Dictation Scenarios</title>
+<link rel="stylesheet" href="styles.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<header class="top">
+  <h1>Dictation Scenarios</h1>
+  <div class="top-actions">
+    <button type="button" class="chip-btn" id="btn-card" aria-label="Current scenario">Card</button>
+    <button type="button" class="chip-btn" id="btn-overview" aria-label="All scenarios"><span id="progress">0/0</span></button>
+    <button type="button" class="chip-btn" id="btn-export">Export</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main id="main">
+  <section id="view-card" class="view">
+    <p class="loading">Loading scenarios…</p>
+  </section>
+  <section id="view-overview" class="view" hidden></section>
+  <section id="view-export" class="view" hidden></section>
+</main>
+
+<nav class="bar" id="bar" aria-label="Recorder">
+  <div class="meter" aria-hidden="true"><div class="meter-fill" id="meter"></div></div>
+  <div class="bar-row">
+    <button type="button" class="nav-btn" id="btn-prev" aria-label="Previous scenario">&#8249;</button>
+    <div class="rec-wrap">
+      <div class="timer" id="timer">0:00</div>
+      <button type="button" class="rec-btn" id="btn-rec">Record</button>
+    </div>
+    <button type="button" class="nav-btn" id="btn-next" aria-label="Next scenario">&#8250;</button>
+  </div>
+</nav>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

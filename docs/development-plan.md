@@ -95,6 +95,11 @@ Each phase has an exit test. Stop or re-plan at any exit that fails.
    or notes (30 to 90 s), 10 long (2 min+, for paragraphs). Stage at least 5 with a deliberate interruption
    (someone at the door) for `L2.non-directed-speech`. Hand-clean each to the style guide, at layer 1 and
    at layer 1+2. These 40 are **evaluation only**, never trained on.
+   The scenario cards are in [`../recording/scenarios.json`](../recording/scenarios.json) (written 2026-10-16):
+   fictional cast and details so no real PII enters the set, a delivery cue per card that stages the
+   targeted disfluency, and the taxonomy ids each card is meant to exercise. Record them on the phone with
+   the [recording app](../app/README.md) (https://danielrosehill.github.io/ASR-Post-Processor-Model/app/),
+   which keeps takes on the device and exports a zip with a `manifest.json`.
 2. **No-op set, 50 pairs.** From Read-Aloud-Voice-Sentences, `email`/`message`/`long` rows transcribed
    by stock Parakeet v2 where the output already matches the reference.
 3. **Synthetic set, 400 pairs.** Clean-first generation: an LLM writes clean target text across the same

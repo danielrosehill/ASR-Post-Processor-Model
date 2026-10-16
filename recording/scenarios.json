@@ -1,0 +1,348 @@
+{
+  "version": 1,
+  "created": "2026-10-16",
+  "instructions": [
+    "Everything here is fictional. Use only the cast and details on the card, never real names, numbers or places from your own life.",
+    "Speak, don't read. Glance at the details, then dictate the way you normally would. Order and wording are up to you.",
+    "Don't fix your own mistakes by retaking. Stumbles, restarts and 'um's are the data. Retake only if the recording itself failed.",
+    "Follow the delivery cues. They make sure each disfluency or interruption type shows up enough times across the set.",
+    "Hold the phone the way you do when dictating normally, in a normal room. No studio conditions."
+  ],
+  "cast": [
+    {"name": "Sarah", "role": "your wife"},
+    {"name": "Ben", "role": "your son, 9"},
+    {"name": "Lily", "role": "your daughter, 5 (turning 6)"},
+    {"name": "Ruth", "role": "Sarah's mother, lives in Haifa"},
+    {"name": "Josh", "role": "your old friend"},
+    {"name": "Rachel Klein", "role": "your manager at Northwind Analytics"},
+    {"name": "Tom Becker", "role": "your colleague at Northwind Analytics"},
+    {"name": "David Levin", "role": "your client contact at Meridian Logistics"},
+    {"name": "Mark", "role": "your landlord"},
+    {"name": "Dr. Feldman", "role": "your dentist, in Tel Aviv"},
+    {"name": "Ms. Cohen", "role": "Ben's teacher"}
+  ],
+  "scenarios": [
+    {
+      "id": "S01", "length": "short", "target_seconds": [10, 30], "use_case": "whatsapp",
+      "title": "Running late",
+      "situation": "You're on a delayed train. Send Sarah a quick WhatsApp.",
+      "details": ["Train is delayed", "You'll be about 20 minutes late", "Ask her to start dinner without you"],
+      "delivery": ["Say 'gonna' at least once", "Give the delay as 20 minutes, then correct yourself to 30"],
+      "targets": ["L1.informal-contractions", "L2.spoken-self-correction", "L1.filler-removal"]
+    },
+    {
+      "id": "S02", "length": "short", "target_seconds": [10, 30], "use_case": "shopping_list",
+      "title": "Quick shopping list",
+      "situation": "Note to self before going to the supermarket.",
+      "details": ["Milk", "Eggs", "Sourdough loaf", "Two avocados", "Dish soap", "AA batteries"],
+      "delivery": ["Say one item twice without noticing", "Remember the batteries at the very end ('oh, and…')"],
+      "targets": ["L2.content-repetition", "L1.filler-removal"]
+    },
+    {
+      "id": "S03", "length": "short", "target_seconds": [15, 30], "use_case": "todo",
+      "title": "Three errands",
+      "situation": "Dictate a to-do note while walking.",
+      "details": ["Call the bank about the blocked card", "Renew the car insurance by Thursday", "Book a haircut"],
+      "delivery": ["Pause for a couple of seconds in the middle of a sentence, as if thinking, then carry on"],
+      "targets": ["L1.pause-induced-sentence-breaks", "L1.filler-removal"]
+    },
+    {
+      "id": "S04", "length": "short", "target_seconds": [10, 25], "use_case": "whatsapp",
+      "title": "Moving the call",
+      "situation": "WhatsApp to Tom Becker.",
+      "details": ["You can't make the 3 pm call", "Ask to move it to 4 pm"],
+      "delivery": ["Start the first sentence, abandon it, and restart it differently"],
+      "targets": ["L1.false-start-repair"]
+    },
+    {
+      "id": "S05", "length": "short", "target_seconds": [8, 20], "use_case": "note_to_self",
+      "title": "Segment name idea",
+      "situation": "A quick idea note for a podcast you produce.",
+      "details": ["New segment name: 'Prompt of the Week'", "Could open each episode"],
+      "delivery": ["Say it cleanly in one go. This is a 'leave it alone' example"],
+      "targets": ["no-op"]
+    },
+    {
+      "id": "S06", "length": "short", "target_seconds": [15, 30], "use_case": "whatsapp",
+      "title": "School play",
+      "situation": "Message to the family WhatsApp group.",
+      "details": ["Ben's school play is Thursday at 6 pm", "At the school hall", "Ask who's coming so you can save seats"],
+      "delivery": ["Lean on hedges: 'kind of', 'basically', 'I guess'"],
+      "targets": ["L2.verbal-hedges", "L1.filler-removal"]
+    },
+    {
+      "id": "S07", "length": "short", "target_seconds": [10, 25], "use_case": "todo",
+      "title": "Garage reminder",
+      "situation": "Reminder for yourself.",
+      "details": ["Take the car to the garage Sunday at 8 am", "Ask them about the noise from the front brakes"],
+      "delivery": ["Say 'wanna' or 'gotta' once"],
+      "targets": ["L1.informal-contractions"]
+    },
+    {
+      "id": "S08", "length": "short", "target_seconds": [8, 20], "use_case": "whatsapp",
+      "title": "Thanks for the drill",
+      "situation": "WhatsApp to Josh.",
+      "details": ["Thanks for lending the drill", "You'll bring it back at the weekend"],
+      "delivery": ["Say it cleanly in one go. This is a 'leave it alone' example"],
+      "targets": ["no-op"]
+    },
+    {
+      "id": "S09", "length": "short", "target_seconds": [10, 25], "use_case": "calendar",
+      "title": "Dentist appointment",
+      "situation": "Calendar note.",
+      "details": ["Dentist, Dr. Feldman", "Tuesday at 10:30", "Clinic on Ibn Gabirol Street, Tel Aviv"],
+      "delivery": ["Say Monday first, then 'no, sorry, Tuesday'"],
+      "targets": ["L2.spoken-self-correction"]
+    },
+    {
+      "id": "S10", "length": "short", "target_seconds": [15, 30], "use_case": "whatsapp",
+      "title": "Leaking tap",
+      "situation": "WhatsApp to Mark, your landlord.",
+      "details": ["The kitchen tap has been leaking since Sunday", "It's getting worse", "When can a plumber come?"],
+      "delivery": ["Let a word or two double up ('the the', 'it's it's')"],
+      "targets": ["L1.stutter-repetition"]
+    },
+    {
+      "id": "S11", "length": "short", "target_seconds": [15, 30], "use_case": "shopping_list",
+      "title": "Birthday party shopping",
+      "situation": "Shopping list for Lily's 6th birthday party.",
+      "details": ["Crisps", "Hummus", "Three bottles of wine", "Paper plates", "Six candles for the cake"],
+      "delivery": ["Change your mind about one quantity ('two bottles, actually make it three')"],
+      "targets": ["L2.spoken-self-correction", "L1.filler-removal"]
+    },
+    {
+      "id": "S12", "length": "short", "target_seconds": [15, 30], "use_case": "ai_prompt",
+      "title": "Summarise an article",
+      "situation": "Dictating a prompt to an AI assistant.",
+      "details": ["Summarise the article below", "Five bullet points", "It's for a newsletter, so keep it plain"],
+      "delivery": ["Restart the prompt once after a couple of words"],
+      "targets": ["L1.false-start-repair"]
+    },
+    {
+      "id": "S13", "length": "short", "target_seconds": [5, 15], "use_case": "note_to_self",
+      "title": "Where I parked",
+      "situation": "Note to self in a car park.",
+      "details": ["Level minus 2", "Spot B14", "Near the lifts"],
+      "delivery": ["Say it cleanly in one go. This is a 'leave it alone' example"],
+      "targets": ["no-op"]
+    },
+    {
+      "id": "S14", "length": "short", "target_seconds": [15, 30], "use_case": "whatsapp",
+      "title": "Kindergarten pickup",
+      "situation": "WhatsApp to Sarah from the office.",
+      "details": ["Your meeting is running over", "Can she pick up Lily from kindergarten at 1:30?"],
+      "delivery": ["INTERRUPTION: halfway through, someone in the office asks you something. Answer them aloud ('yeah, one sec, I'll send it after this'), then finish the message"],
+      "targets": ["L2.non-directed-speech", "L2.train-of-thought-recovery"]
+    },
+    {
+      "id": "S15", "length": "short", "target_seconds": [15, 30], "use_case": "todo",
+      "title": "Admin to-dos",
+      "situation": "To-do note at the end of the day.",
+      "details": ["Email the receipts to the accountant", "Pay the electricity bill", "Call Ruth back"],
+      "delivery": ["Casual tone: 'gonna', 'basically'"],
+      "targets": ["L1.informal-contractions", "L2.verbal-hedges"]
+    },
+
+    {
+      "id": "M01", "length": "medium", "target_seconds": [40, 90], "use_case": "email",
+      "title": "Weekly update to Rachel",
+      "situation": "Email to Rachel Klein, your manager, with your weekly update.",
+      "details": ["The Meridian dashboard is finished", "Still waiting on shipment data from David Levin", "Next week you start the churn analysis", "Ask if she wants a demo on Monday"],
+      "delivery": ["One false start", "Make the 'waiting on David' point twice"],
+      "targets": ["L1.false-start-repair", "L2.content-repetition", "L1.filler-removal"]
+    },
+    {
+      "id": "M02", "length": "medium", "target_seconds": [40, 90], "use_case": "email",
+      "title": "Data request to Meridian",
+      "situation": "Email to David Levin at Meridian Logistics.",
+      "details": ["You need access to their Q3 shipment data", "The NDA was signed last week", "You need it by 30 October", "Offer a short call to walk through the format"],
+      "delivery": ["Say the 31st first, then correct it to the 30th", "INTERRUPTION: a colleague calls over; answer 'yeah, I'll be there in five', then continue"],
+      "targets": ["L2.spoken-self-correction", "L2.non-directed-speech"]
+    },
+    {
+      "id": "M03", "length": "medium", "target_seconds": [45, 90], "use_case": "note_to_self",
+      "title": "Blog ideas",
+      "situation": "Brainstorm note: blog post ideas about voice typing.",
+      "details": ["Idea 1: dictating email on a phone", "Idea 2: why read speech is not real speech", "Idea 3: what a pause button would change"],
+      "delivery": ["Lose the third idea for a moment ('what was the third one… right')"],
+      "targets": ["L2.train-of-thought-recovery", "L2.verbal-hedges"]
+    },
+    {
+      "id": "M04", "length": "medium", "target_seconds": [45, 90], "use_case": "whatsapp",
+      "title": "Weekend plan",
+      "situation": "Long WhatsApp voice-to-text to Sarah about the weekend.",
+      "details": ["Friday dinner at Ruth's in Haifa, 7 pm", "Saturday: beach with the kids", "You still need a gift for Ruth", "Leave Friday by 5 to beat the traffic"],
+      "delivery": ["Casual: 'gonna', 'wanna'", "Pause mid-sentence at least twice"],
+      "targets": ["L1.informal-contractions", "L1.pause-induced-sentence-breaks"]
+    },
+    {
+      "id": "M05", "length": "medium", "target_seconds": [40, 80], "use_case": "email",
+      "title": "Absence note to teacher",
+      "situation": "Email to Ms. Cohen, Ben's teacher.",
+      "details": ["Ben will miss school on Wednesday", "Doctor's appointment in the morning", "Ask what homework he should catch up on"],
+      "delivery": ["Hedges ('just wanted to kind of let you know')", "Restart one sentence"],
+      "targets": ["L2.verbal-hedges", "L1.false-start-repair"]
+    },
+    {
+      "id": "M06", "length": "medium", "target_seconds": [50, 90], "use_case": "meeting_notes",
+      "title": "Call notes with Tom",
+      "situation": "Notes right after a call with Tom Becker.",
+      "details": ["Launch moved to 12 November", "Tom owns QA", "You own the documentation", "Budget agreed at 15,000 shekels"],
+      "delivery": ["Say the budget as 12,000, then correct it to 15,000", "Repeat the launch date at the end"],
+      "targets": ["L2.spoken-self-correction", "L2.content-repetition"]
+    },
+    {
+      "id": "M07", "length": "medium", "target_seconds": [45, 90], "use_case": "email",
+      "title": "Team lunch invite",
+      "situation": "Email to the team inviting them to lunch.",
+      "details": ["Thursday at 1 pm", "A restaurant on Rothschild Boulevard, Tel Aviv", "Reply with any dietary needs by Tuesday"],
+      "delivery": ["INTERRUPTION: your phone rings. Answer briefly ('hello? …no, not interested, thanks, bye'), then pick up where you left off"],
+      "targets": ["L2.non-directed-speech", "L2.train-of-thought-recovery"]
+    },
+    {
+      "id": "M08", "length": "medium", "target_seconds": [50, 90], "use_case": "ai_prompt",
+      "title": "Eilat trip prompt",
+      "situation": "Prompt to an AI to plan a family trip.",
+      "details": ["Three days in Eilat", "Two kids, 9 and 5", "Hotel near the beach", "Budget around 6,000 shekels", "No drives longer than an hour"],
+      "delivery": ["Add constraints as you remember them ('oh, and also…')"],
+      "targets": ["L1.filler-removal", "L1.pause-induced-sentence-breaks"]
+    },
+    {
+      "id": "M09", "length": "medium", "target_seconds": [45, 90], "use_case": "email",
+      "title": "Internet outage complaint",
+      "situation": "Complaint email to your internet provider.",
+      "details": ["No internet for three days", "Ticket number 48213", "Nobody has called back", "You want a credit on this month's bill"],
+      "delivery": ["Sound mildly annoyed", "Make the 'nobody called back' point twice"],
+      "targets": ["L2.content-repetition", "L1.stutter-repetition"]
+    },
+    {
+      "id": "M10", "length": "medium", "target_seconds": [50, 90], "use_case": "todo",
+      "title": "Week to-do from the car",
+      "situation": "Dictating the week's to-do list while parked.",
+      "details": ["Finish the Meridian slides", "Book Lily's birthday entertainer", "Renew Ben's passport", "Order printer ink", "Reply to Josh", "Gym on Tuesday and Thursday"],
+      "delivery": ["Long thinking pauses mid-sentence", "Say 'where was I' once"],
+      "targets": ["L1.pause-induced-sentence-breaks", "L2.train-of-thought-recovery"]
+    },
+    {
+      "id": "M11", "length": "medium", "target_seconds": [40, 80], "use_case": "note_to_self",
+      "title": "Book recommendation",
+      "situation": "Note to self about a book Josh recommended.",
+      "details": ["A history of the shipping container", "Josh says the middle chapters are the best", "Relevant to the Meridian work", "Buy the paperback, not the e-book"],
+      "delivery": ["Lots of 'sort of', 'basically', 'I think'"],
+      "targets": ["L2.verbal-hedges", "L1.filler-removal"]
+    },
+    {
+      "id": "M12", "length": "medium", "target_seconds": [30, 60], "use_case": "email",
+      "title": "Day off request",
+      "situation": "Email to Rachel Klein asking for a day off.",
+      "details": ["You'd like 3 November off", "Tom has agreed to cover the client call", "Nothing else is due that day"],
+      "delivery": ["Say it as cleanly as you naturally can, close to a 'leave it alone' example"],
+      "targets": ["no-op"]
+    },
+    {
+      "id": "M13", "length": "medium", "target_seconds": [50, 90], "use_case": "whatsapp",
+      "title": "Ruth's 80th",
+      "situation": "WhatsApp to the family group about Ruth's 80th birthday.",
+      "details": ["Saturday the 14th, lunch", "Garden restaurant in Haifa", "Each family brings one dessert", "Collecting 200 shekels each for the gift"],
+      "delivery": ["INTERRUPTION: Lily grabs something. Tell her aloud ('Lily, put that down please'), then continue"],
+      "targets": ["L2.non-directed-speech", "L1.filler-removal"]
+    },
+    {
+      "id": "M14", "length": "medium", "target_seconds": [45, 90], "use_case": "shopping_list",
+      "title": "Weekly shop",
+      "situation": "The big weekly shopping list, remembered out of order.",
+      "details": ["Chicken thighs", "Rice", "Tomatoes and cucumbers", "Yoghurt", "Coffee beans", "Laundry detergent", "Cereal for the kids", "Olive oil", "Bin bags", "Apples", "Cheese", "Toilet paper"],
+      "delivery": ["Jump back to a category you already did", "Repeat one item"],
+      "targets": ["L2.content-repetition", "L1.filler-removal"]
+    },
+    {
+      "id": "M15", "length": "medium", "target_seconds": [45, 90], "use_case": "email",
+      "title": "Reply to a recruiter",
+      "situation": "Reply to a recruiter who contacted you about a data role.",
+      "details": ["You're interested", "You couldn't start before January", "Ask for the full job description", "Ask about the salary range"],
+      "delivery": ["Two false starts", "Hedges"],
+      "targets": ["L1.false-start-repair", "L2.verbal-hedges"]
+    },
+
+    {
+      "id": "L01", "length": "long", "target_seconds": [120, 240], "use_case": "email",
+      "title": "Project status to Meridian",
+      "situation": "A status email to David Levin at Meridian Logistics. Long enough to need paragraphs.",
+      "details": ["Progress: dashboard live, data pipeline running nightly", "Risk: the Q3 data has gaps for two warehouses", "Ask: can their IT team re-export those two", "Next steps: churn analysis starts on the 4th, first results mid-November", "Offer a review call next Thursday"],
+      "delivery": ["Pause between topics as you naturally would", "One self-correction on a date", "INTERRUPTION: a courier at the door. Talk to them ('yeah, just leave it there, thanks'), then carry on"],
+      "targets": ["L1.paragraph-boundaries", "L2.spoken-self-correction", "L2.non-directed-speech"]
+    },
+    {
+      "id": "L02", "length": "long", "target_seconds": [150, 240], "use_case": "content_draft",
+      "title": "Blog draft: why I dictate",
+      "situation": "First draft of a blog post called 'Why I dictate everything'.",
+      "details": ["Intro: two years of voice typing", "Reason 1: speed", "Reason 2: thinking out loud produces better first drafts", "Reason 3: less time hunched over a keyboard", "Close: what's still missing (a pause button)"],
+      "delivery": ["Lose your train of thought once and recover", "Repeat one point in different words"],
+      "targets": ["L1.paragraph-boundaries", "L2.train-of-thought-recovery", "L2.content-repetition"]
+    },
+    {
+      "id": "L03", "length": "long", "target_seconds": [120, 210], "use_case": "note_to_self",
+      "title": "Kids' room renovation",
+      "situation": "Planning note for redoing Ben and Lily's room.",
+      "details": ["Paint: light green for Ben's side, pale yellow for Lily's", "A bunk bed instead of two beds", "Budget: around 8,000 shekels", "Do it during the December holiday", "Ask Mark (landlord) for permission to paint"],
+      "delivery": ["Hedges throughout", "Think aloud and change one decision"],
+      "targets": ["L1.paragraph-boundaries", "L2.verbal-hedges", "L2.spoken-self-correction"]
+    },
+    {
+      "id": "L04", "length": "long", "target_seconds": [150, 240], "use_case": "email",
+      "title": "Tool proposal to Rachel",
+      "situation": "Email to Rachel Klein proposing an internal reporting tool.",
+      "details": ["Problem: client reports take two days to assemble by hand", "Solution: a template generator connected to the warehouse data", "Cost: about three weeks of your time", "Benefit: reports in an hour", "Ask: a 30-minute slot to discuss"],
+      "delivery": ["Restart a whole paragraph once ('actually, let me put it another way')", "False starts"],
+      "targets": ["L1.paragraph-boundaries", "L1.false-start-repair", "L2.spoken-self-correction"]
+    },
+    {
+      "id": "L05", "length": "long", "target_seconds": [150, 240], "use_case": "meeting_notes",
+      "title": "Meridian quarterly review minutes",
+      "situation": "Minutes written up after the quarterly review with Meridian.",
+      "details": ["Attendees: David Levin, Rachel Klein, Tom Becker, you", "Decision: extend the contract to March", "Decision: add a second dashboard for warehouse managers", "Action: Tom sends the revised quote by Friday", "Action: you schedule user interviews", "Action: David shares warehouse contacts"],
+      "delivery": ["Get one name wrong and correct it", "Get one deadline wrong and correct it"],
+      "targets": ["L1.paragraph-boundaries", "L2.spoken-self-correction"]
+    },
+    {
+      "id": "L06", "length": "long", "target_seconds": [120, 210], "use_case": "email",
+      "title": "Catching up with Josh",
+      "situation": "A long, casual catch-up message to Josh.",
+      "details": ["Your trip to Eilat with the kids", "Ben started guitar lessons", "Lily turns six next month", "Invite him and his partner for dinner next month"],
+      "delivery": ["Very casual: 'gonna', 'wanna', 'kinda'", "INTERRUPTION: Sarah asks if you fed the cat. Answer her aloud, then continue"],
+      "targets": ["L1.informal-contractions", "L2.non-directed-speech", "L1.paragraph-boundaries"]
+    },
+    {
+      "id": "L07", "length": "long", "target_seconds": [120, 210], "use_case": "ai_prompt",
+      "title": "Cover letter brief",
+      "situation": "A detailed prompt asking an AI to write a cover letter.",
+      "details": ["Role: senior data analyst at a logistics company", "Background: six years in analytics, client-facing", "Highlight the Meridian dashboard project", "Tone: confident, not stiff", "One page maximum", "Avoid clichés like 'passionate' and 'team player'"],
+      "delivery": ["Add requirements as you think of them", "Change your mind on the tone once"],
+      "targets": ["L1.paragraph-boundaries", "L2.spoken-self-correction", "L1.pause-induced-sentence-breaks"]
+    },
+    {
+      "id": "L08", "length": "long", "target_seconds": [150, 240], "use_case": "report",
+      "title": "Churn findings",
+      "situation": "Dictating the summary section of the churn analysis report.",
+      "details": ["Overall churn: 14% last year, up from 11%", "Driver 1: late deliveries in the north region", "Driver 2: price rise in March", "Driver 3: no dedicated account manager for small clients", "Recommendation: fix delivery times first"],
+      "delivery": ["Give one percentage wrong and correct it", "Clear pauses between drivers"],
+      "targets": ["L1.paragraph-boundaries", "L2.spoken-self-correction", "L1.filler-removal"]
+    },
+    {
+      "id": "L09", "length": "long", "target_seconds": [120, 210], "use_case": "note_to_self",
+      "title": "End-of-week reflection",
+      "situation": "A reflective note to yourself on Friday afternoon.",
+      "details": ["Went well: the Meridian review", "Didn't go well: too many meetings, no deep work", "Next week: block two mornings for the churn analysis", "Personal: book the Haifa trip, call Josh"],
+      "delivery": ["Hedges", "Repeat the 'too many meetings' point", "Say 'what else… right' once"],
+      "targets": ["L1.paragraph-boundaries", "L2.verbal-hedges", "L2.content-repetition", "L2.train-of-thought-recovery"]
+    },
+    {
+      "id": "L10", "length": "long", "target_seconds": [120, 210], "use_case": "email",
+      "title": "Building committee complaint",
+      "situation": "Email to your building committee about renovation noise.",
+      "details": ["Drilling from flat 7 has started at 7 am for two weeks", "Ask that work start no earlier than 8:30", "No work on Friday afternoons", "Propose a residents' meeting next Sunday evening"],
+      "delivery": ["INTERRUPTION: a knock at the door; sign for a delivery while still recording ('hi, yes, where do I sign… thanks'), then say 'okay, where was I'", "Restart one sentence"],
+      "targets": ["L2.non-directed-speech", "L2.train-of-thought-recovery", "L1.paragraph-boundaries", "L1.false-start-repair"]
+    }
+  ]
+}

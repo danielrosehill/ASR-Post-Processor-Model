@@ -1,0 +1,66 @@
+{
+  "version": 0,
+  "_note": "SAMPLE data for testing the app only. The real set is recording/scenarios.json; the app uses this file only when that one returns 404.",
+  "cast": [
+    {"name": "Sarah", "role": "your wife"},
+    {"name": "Tom", "role": "your colleague at the agency"},
+    {"name": "Mr. Levin", "role": "your landlord"}
+  ],
+  "scenarios": [
+    {
+      "id": "X01",
+      "length": "short",
+      "target_seconds": [10, 30],
+      "use_case": "whatsapp",
+      "title": "Running late for dinner",
+      "situation": "You're stuck on a delayed bus and need to tell Sarah you'll be late for dinner with her parents.",
+      "details": ["the bus is stuck near the central station", "about twenty minutes late", "she should start without you"],
+      "delivery": ["change your mind about the time halfway: first say twenty minutes, then say more like half an hour"],
+      "targets": ["L1.filler-removal", "L2.spoken-self-correction"]
+    },
+    {
+      "id": "X02",
+      "length": "medium",
+      "target_seconds": [30, 90],
+      "use_case": "email",
+      "title": "Boiler still broken",
+      "situation": "You're writing to Mr. Levin, your landlord, because the boiler he promised to fix last week is still not working.",
+      "details": ["the technician came on Tuesday", "no hot water since Sunday", "you can be home Thursday morning"],
+      "delivery": ["start one sentence, abandon it, and restart it differently", "repeat the point about no hot water near the end"],
+      "targets": ["L1.false-start-repair", "L2.content-repetition", "L1.paragraph-boundaries"]
+    },
+    {
+      "id": "X03",
+      "length": "medium",
+      "target_seconds": [30, 90],
+      "use_case": "note_to_self",
+      "title": "Ideas after the client call",
+      "situation": "You just got off a call with Tom about a client pitch and want to capture your thoughts before you forget them.",
+      "details": ["the client wants a shorter video", "budget is tight this quarter", "ask Tom about the stock footage licence"],
+      "delivery": ["someone knocks at the door partway through: say 'one sec, come in, thanks' to them, then carry on"],
+      "targets": ["L2.non-directed-speech", "L1.filler-removal"]
+    },
+    {
+      "id": "X04",
+      "length": "long",
+      "target_seconds": [120, 240],
+      "use_case": "report",
+      "title": "Weekly project update",
+      "situation": "You're dictating the weekly status update for your team: what got done, what slipped, and what's next.",
+      "details": ["the website launch moved to next Monday", "two new clients signed", "Tom is on leave Wednesday to Friday", "the analytics dashboard is still blocked"],
+      "delivery": ["cover at least three distinct topics so paragraph breaks are natural", "lose your train of thought once and recover"],
+      "targets": ["L1.paragraph-boundaries", "L2.train-of-thought-recovery", "L1.pause-induced-sentence-breaks"]
+    },
+    {
+      "id": "X05",
+      "length": "short",
+      "target_seconds": [10, 30],
+      "use_case": "shopping_list",
+      "title": "Shopping list for the weekend",
+      "situation": "You're adding to the shared shopping list before you head out.",
+      "details": ["milk", "two kinds of bread", "dishwasher tablets"],
+      "delivery": ["say it as you'd naturally say it, not as a numbered list"],
+      "targets": ["L1.filler-removal", "L1.informal-contractions"]
+    }
+  ]
+}
