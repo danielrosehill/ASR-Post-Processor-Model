@@ -84,9 +84,9 @@ Each phase has an exit test. Stop or re-plan at any exit that fails.
 
 - Review [`spec.md`](spec.md) and the taxonomy. Decide the three experimental layer-2 items
   (`L2.non-directed-speech`, `L2.train-of-thought-recovery`, `L2.verbal-hedges`): in the POC or not.
-- Write the target-style guide: five to ten hand-cleaned real examples, one per use case (WhatsApp
-  message, email, note to self, long report section). Paragraph length preference is set here.
-- Exit: the speaker agrees each example is "what I'd send".
+- The target-style guide is the first ten items edited in the triples editor (decision
+  [0002](decisions/0002-triples-training-data.md)). Paragraph length preference is set there.
+- Exit: the speaker agrees each of those ten is "what I'd send".
 
 ### Phase 1: data (POC scale)
 
@@ -102,13 +102,17 @@ Each phase has an exit test. Stop or re-plan at any exit that fails.
    which keeps takes on the device and exports a zip with a `manifest.json`.
 2. **No-op set, 50 pairs.** From Read-Aloud-Voice-Sentences, `email`/`message`/`long` rows transcribed
    by stock Parakeet v2 where the output already matches the reference.
-3. **Synthetic set, 400 pairs.** Clean-first generation: an LLM writes clean target text across the same
+3. **Triples set, about 100 (primary training data since 2026-10-16).** Real raw dictation, stock S1-mini's
+   output, and the speaker's edit of it, made in the local editor (`uv run tools/editor/server.py`). See decision
+   [0002](decisions/0002-triples-training-data.md).
+4. **Synthetic set, up to 400 pairs (optional augmentation since 2026-10-16).** Only if the first adapter
+   underfits a category the triples rarely contain. Clean-first generation: an LLM writes clean target text across the same
    use-case mix; a second step injects transformations from the taxonomy, conditioned on 10 real raw
    Parakeet transcripts from step 1 as style examples. Each pair records `applied: [taxonomy ids]`.
    Length mix weighted towards long texts (at least 30% over 150 words) so paragraph boundaries appear.
    Second family LLM reviews a 10% sample for realism.
-- Exit: on a blind sample of 20 synthetic raw texts mixed with 20 real ones, the speaker cannot reliably
-  tell them apart, and every taxonomy id in scope appears at least 20 times.
+- Exit: at least 90 non-skipped triples, with the S1-mini accept rate recorded. If the synthetic set is generated:
+  on a blind sample of 20 synthetic raw texts mixed with 20 real ones, the speaker cannot reliably tell them apart.
 
 ### Phase 2: baselines (no training)
 
@@ -156,9 +160,12 @@ Run all of these on the 40-clip real eval set, scored with the metrics in [`spec
 
 ## Decision log
 
-- **2026-10-16: fine-tune S1-mini rather than a general small base.** The speaker's call after the prior-art
-  review. S1-mini already covers most of layer 1, is on-device sized, and should need fewer pairs. The Qwen3-0.6B
-  control run keeps the comparison honest. Recorded in [`fine-tuning.md`](fine-tuning.md).
+Each decision has its own record in [`decisions/`](decisions/).
+
+| # | Date | Decision |
+|---|---|---|
+| [0001](decisions/0001-fine-tune-s1-mini.md) | 2026-10-16 | Fine-tune S1-mini (LoRA) rather than a general small base; Qwen3-0.6B as control |
+| [0002](decisions/0002-triples-training-data.md) | 2026-10-16 | POC training data is about 100 hand-edited triples (raw → S1-mini → speaker); synthetic becomes optional |
 
 ## Open questions
 

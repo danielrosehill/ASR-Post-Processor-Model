@@ -10,7 +10,8 @@ dictation. Public repo: never add private material (see "Do not" below).
 3. `taxonomy/transformations.json`: the scope. Every transformation has an `owner`; only `owner: "postprocessor"` items are this model's job.
 4. `docs/spec.md`: input/output contract and evaluation metrics.
 5. `docs/fine-tuning.md`: the chosen base (S1-mini), the exact prompt format, run commands and licence terms.
-6. `context/transcript-raw.txt`: the speaker's own words. When a doc and the transcript disagree about intent, the transcript wins; fix the doc.
+6. `docs/decisions/`: numbered decision records. A new decision gets a new file and a row in the plan's decision log.
+7. `context/transcript-raw.txt`: the speaker's own words. When a doc and the transcript disagree about intent, the transcript wins; fix the doc.
 
 ## Ground rules
 
@@ -23,6 +24,7 @@ dictation. Public repo: never add private material (see "Do not" below).
 - `training/s1mini_lora.py` is deliberately one self-contained file (Jobs uploads only the script). Keep the prompt format there; do not split it into modules.
 - S1-mini's system prompt is used verbatim. Do not reword it: its card says that degrades output.
 - Training pairs go to `danielrosehill/Parakeet-Dictation-Cleanup-Pairs`; eval clips go only to `danielrosehill/Parakeet-Dictation-Cleanup-Eval`.
+- Training pairs are raw → the speaker's final text. Never generate or "improve" the `final` field of `data/triples/triples.jsonl`: it is the human label.
 - Python environments use `uv`.
 
 ## Related repos and datasets

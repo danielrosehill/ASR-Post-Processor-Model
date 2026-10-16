@@ -71,6 +71,13 @@ Phase 1 data mix, not just a risk to note.
 5. **Length.** The card recommends inputs under about 1,000 tokens. Long notes are chunked by the caller
    (spec), so training inputs stay under that too; `--max-length 2560` covers prompt plus output.
 
+## Training data
+
+Primary: about 100 triples (raw, stock S1-mini output, the speaker's edit) made in the local editor,
+[`../tools/editor/`](../tools/editor/), converted to pairs with `python scripts/pairs.py from-triples`. Why and how:
+decision [0002](decisions/0002-triples-training-data.md). S1-mini's own training data is not published, so it cannot
+be reused.
+
 ## Running it
 
 Training runs on [Hugging Face Jobs](https://huggingface.co/docs/huggingface_hub/guides/jobs) (the laptop has no

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triples Editor</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #deded8;
+  --accent: #2f5bd3; --ok: #1f7a4d; --warn: #a15c00; --ins-bg: #d8f3e3; --ins: #12512f;
+  --del-bg: #fbdcdc; --del: #8a1c1c; --chip: #eeeeea;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --panel: #1f1f1d; --text: #ebebe6; --muted: #9a9a92; --line: #34342f;
+    --accent: #7a9cff; --ok: #5cc68e; --warn: #e2a24a; --ins-bg: #173a27; --ins: #9be3b9;
+    --del-bg: #43201f; --del: #f2a9a9; --chip: #2a2a27; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+.app { display: grid; grid-template-columns: 250px 1fr; height: 100vh; }
+aside { border-right: 1px solid var(--line); overflow: auto; background: var(--panel); }
+aside header { padding: 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+aside h1 { font-size: 15px; margin: 0 0 4px; }
+.progress { font-size: 13px; color: var(--muted); }
+.bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; }
+.bar > div { height: 100%; background: var(--ok); border-radius: 2px; }
+.filter { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+.filter button { font-size: 12px; padding: 2px 8px; }
+ul { list-style: none; margin: 0; padding: 0; }
+li { padding: 6px 12px; font-size: 13px; cursor: pointer; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); }
+li.active { background: var(--chip); font-weight: 600; }
+li .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--line); }
+li .dot.edited { background: var(--accent); } li .dot.s1-accepted { background: var(--ok); }
+li .dot.raw-kept { background: var(--warn); } li .dot.skipped { background: var(--muted); opacity: .4; }
+li .w { margin-left: auto; color: var(--muted); font-size: 12px; }
+main { overflow: auto; padding: 16px 20px 40px; }
+.guide { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.guide b { color: var(--text); }
+.meta { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.panes { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 12px; }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 320px; }
+.pane h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+.pane .body { padding: 10px 12px; white-space: pre-wrap; overflow: auto; flex: 1; }
+textarea { flex: 1; width: 100%; border: 0; padding: 10px 12px; font: inherit; background: transparent; color: var(--text); resize: vertical; min-height: 300px; outline: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; align-items: center; }
+button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.good { border-color: var(--ok); color: var(--ok); }
+button.small { font-size: 12px; padding: 2px 8px; }
+.spacer { flex: 1; }
+.diffbox { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; }
+.diffhead { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+ins { background: var(--ins-bg); color: var(--ins); text-decoration: none; border-radius: 3px; }
+del { background: var(--del-bg); color: var(--del); border-radius: 3px; }
+.para { color: var(--muted); }
+details { margin-top: 14px; }
+summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.tax { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; margin-top: 8px; font-size: 13px; }
+.tax label { display: flex; gap: 6px; align-items: baseline; }
+.row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+input[type=text] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); width: 100%; }
+.toast { position: fixed; bottom: 16px; right: 16px; background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); }
+.addbox textarea { border: 1px solid var(--line); border-radius: 6px; min-height: 100px; }
+@media (max-width: 1000px) { .app { grid-template-columns: 1fr; height: auto; } aside { max-height: 40vh; } .panes { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <header>
+      <h1>Triples editor</h1>
+      <div class="progress" id="progress"></div>
+      <div class="bar"><div id="barfill" style="width:0"></div></div>
+      <div class="progress" id="s1status"></div>
+      <div class="filter">
+        <button class="small" data-f="all">All</button>
+        <button class="small" data-f="todo">To do</button>
+        <button class="small" data-f="done">Done</button>
+        <button class="small" id="addbtn">+ New</button>
+      </div>
+    </header>
+    <ul id="list"></ul>
+  </aside>
+  <main>
+    <div class="guide">
+      <b>Target: what you would send.</b> General purpose, light touch, "not too much, not too little". Keep the wording.
+      Remove fillers, stutters and false starts; <i>gonna</i> to <i>going to</i>; join sentences broken by pauses; add short
+      paragraphs; drop repeated points and speech aimed at someone else in the room.
+      <b>Do not</b> restyle, reorder, add headings, or fix misheard words (homophones and vocabulary are the ASR's job; leave them as they are).
+    </div>
+    <div id="editor"></div>
+    <div id="addview" hidden>
+      <div class="addbox pane"><h2>New raw transcript (paste Parakeet output)</h2>
+        <textarea id="newraw" placeholder="Paste one raw transcript…"></textarea></div>
+      <div class="actions"><button class="primary" id="addsave">Add to queue</button><button id="addcancel">Cancel</button></div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let S = { items: [], triples: {}, taxonomy: [], status: {} };
+let cur = 0, filter = 'all', diffAgainst = 's1', startedFrom = 's1';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  if (!r.ok) throw new Error((await r.json()).error || r.status);
+  return r.json();
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1400); }
+
+function verdictOf(it) { return S.triples[it.id]?.verdict; }
+function visible() {
+  return S.items.map((it, i) => [it, i]).filter(([it]) =>
+    filter === 'all' || (filter === 'todo' ? !verdictOf(it) : !!verdictOf(it)));
+}
+
+function renderList() {
+  const done = S.items.filter(verdictOf).length;
+  $('progress').textContent = `${done} / ${S.items.length} done`;
+  $('barfill').style.width = `${(100 * done) / Math.max(1, S.items.length)}%`;
+  $('list').innerHTML = visible().map(([it, i]) =>
+    `<li data-i="${i}" class="${i === cur ? 'active' : ''}"><span class="dot ${verdictOf(it) || ''}"></span>${esc(it.id)}<span class="w">${it.words}w</span></li>`).join('');
+}
+
+// Word-level diff (LCS over tokens; whitespace kept as tokens so paragraph breaks show).
+function tokens(s) { return s.split(/(\s+)/).filter((t) => t !== ''); }
+function diff(a, b) {
+  const A = tokens(a), B = tokens(b), n = A.length, m = B.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  const show = (t) => (/\n\s*\n/.test(t) ? '<span class="para">¶</span>\n\n' : esc(t));
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out.push(show(A[i])); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push(/^\s+$/.test(A[i]) ? ' ' : `<del>${esc(A[i])}</del>`); i++; }
+    else { out.push(/^\s+$/.test(B[j]) ? show(B[j]) : `<ins>${esc(B[j])}</ins>`); j++; }
+  }
+  while (i < n) { out.push(/^\s+$/.test(A[i]) ? ' ' : `<del>${esc(A[i])}</del>`); i++; }
+  while (j < m) { out.push(/^\s+$/.test(B[j]) ? show(B[j]) : `<ins>${esc(B[j])}</ins>`); j++; }
+  return out.join('');
+}
+
+function renderEditor() {
+  $('addview').hidden = true; $('editor').hidden = false;
+  const it = S.items[cur]; if (!it) { $('editor').innerHTML = '<p>Queue is empty.</p>'; return; }
+  const t = S.triples[it.id];
+  const s1 = it.s1 ? it.s1.output : null;
+  startedFrom = t?.started_from || 's1';
+  const mine = t ? t.final : (s1 ?? '');
+  const control = t?.control || '[Layers: 1,2]';
+  const applied = new Set(t?.applied || []);
+  $('editor').innerHTML = `
+    <div class="meta">${esc(it.id)} · ${esc(it.source)} chunk ${esc(it.chunk)} · ASR: ${esc(it.asr)} · ${it.words} words${t ? ` · saved as <b>${esc(t.verdict)}</b>` : ''}</div>
+    <div class="panes">
+      <div class="pane"><h2>Raw</h2><div class="body">${esc(it.raw)}</div></div>
+      <div class="pane"><h2>S1-mini (stock)<button class="small" id="runs1">Run S1-mini</button></h2>
+        <div class="body" id="s1body">${s1 === null ? '<i>pending… generating in the background</i>' : s1 === '' ? '<i>(empty output)</i>' : esc(s1)}</div></div>
+      <div class="pane"><h2>Yours <span id="startlabel">started from ${startedFrom === 'raw' ? 'raw' : 'S1-mini'}</span></h2>
+        <textarea id="mine" spellcheck="true">${esc(mine)}</textarea></div>
+    </div>
+    <div class="actions">
+      <button class="good" id="accept" title="Alt+A">S1-mini is right ✓</button>
+      <button id="froms1">Start from S1-mini</button>
+      <button id="fromraw">Start from raw</button>
+      <button id="skip">Skip (not useful)</button>
+      <span class="spacer"></span>
+      <label class="row"><input type="radio" name="ctl" value="[Layers: 1,2]" ${control === '[Layers: 1,2]' ? 'checked' : ''}> Layers 1+2 (general purpose)</label>
+      <label class="row"><input type="radio" name="ctl" value="[Layers: 1]" ${control === '[Layers: 1]' ? 'checked' : ''}> Layer 1 only</label>
+      <button class="primary" id="save" title="Ctrl+Enter">Save &amp; next</button>
+    </div>
+    <div class="diffhead">Your changes against
+      <button class="small" id="dS1" ${diffAgainst === 's1' ? 'disabled' : ''}>S1-mini</button>
+      <button class="small" id="dRaw" ${diffAgainst === 'raw' ? 'disabled' : ''}>raw</button>
+      <span style="margin-left:auto"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> save · <kbd>Alt</kbd>+<kbd>A</kbd> accept S1-mini · <kbd>Alt</kbd>+<kbd>↑↓</kbd> move</span></div>
+    <div class="diffbox" id="diff"></div>
+    <details ${applied.size ? 'open' : ''}><summary>Transformations applied (optional labels)</summary>
+      <div class="tax">${S.taxonomy.map((x) => `<label title="${esc(x.description)}"><input type="checkbox" value="${x.id}" ${applied.has(x.id) ? 'checked' : ''}> ${x.id}</label>`).join('')}</div>
+    </details>
+    <details ${t?.notes ? 'open' : ''}><summary>Notes</summary><input type="text" id="notes" value="${esc(t?.notes || '')}" placeholder="Anything odd about this item"></details>`;
+  const upd = () => {
+    const base = diffAgainst === 'raw' ? it.raw : (s1 ?? it.raw);
+    $('diff').innerHTML = diff(base, $('mine').value);
+  };
+  $('mine').addEventListener('input', upd); upd();
+  $('runs1').onclick = async () => {
+    $('s1body').innerHTML = '<i>running…</i>';
+    try { it.s1 = await api('/api/s1', { id: it.id, force: true }); renderEditor(); toast(`S1-mini: ${it.s1.seconds}s`); }
+    catch (e) { $('s1body').textContent = 'error: ' + e.message; }
+  };
+  $('froms1').onclick = () => { if (s1 !== null) { $('mine').value = s1; startedFrom = 's1'; $('startlabel').textContent = 'started from S1-mini'; upd(); } };
+  $('fromraw').onclick = () => { $('mine').value = it.raw; startedFrom = 'raw'; $('startlabel').textContent = 'started from raw'; upd(); };
+  $('accept').onclick = () => { if (s1 === null) return toast('S1-mini output not ready'); $('mine').value = s1; save('s1-accepted'); };
+  $('skip').onclick = () => save('skipped');
+  $('save').onclick = () => save();
+  $('dS1').onclick = () => { diffAgainst = 's1'; renderEditor(); };
+  $('dRaw').onclick = () => { diffAgainst = 'raw'; renderEditor(); };
+}
+
+async function save(forced) {
+  const it = S.items[cur]; const s1 = it.s1 ? it.s1.output : null;
+  const final = $('mine').value.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const verdict = forced || (s1 !== null && final === s1 ? 's1-accepted' : final === it.raw ? 'raw-kept' : 'edited');
+  const triple = {
+    id: it.id, source: it.source, source_id: it.source_id, asr: it.asr, raw: it.raw,
+    s1_output: s1, s1_control: it.s1?.control ?? null, s1_revision: it.s1?.revision ?? null,
+    final: verdict === 'skipped' ? null : final, control: document.querySelector('input[name=ctl]:checked').value,
+    started_from: startedFrom, verdict,
+    applied: [...document.querySelectorAll('.tax input:checked')].map((x) => x.value),
+    notes: $('notes').value.trim() || null,
+  };
+  try {
+    await api('/api/save', { triple }); S.triples[it.id] = triple; toast(`saved: ${verdict}`);
+    const next = S.items.findIndex((x, i) => i > cur && !verdictOf(x));
+    cur = next >= 0 ? next : cur; renderList(); renderEditor();
+  } catch (e) { toast('save failed: ' + e.message); }
+}
+
+async function load() {
+  S = await api('/api/state');
+  const first = S.items.findIndex((x) => !verdictOf(x)); cur = first >= 0 ? first : 0;
+  renderList(); renderEditor(); poll();
+}
+async function poll() {
+  try {
+    const st = await api('/api/status');
+    $('s1status').textContent = `S1-mini: model ${st.model}, precompute ${st.precompute}, ${st.cached} cached`;
+    const it = S.items[cur];
+    if (it && !it.s1 && st.cached && !($('mine') && $('mine').value)) { const fresh = await api('/api/state'); S.items = fresh.items; if (S.items[cur].s1) renderEditor(); }
+    if (st.precompute !== 'done') setTimeout(poll, 4000);
+  } catch { setTimeout(poll, 8000); }
+}
+
+$('list').onclick = (e) => { const li = e.target.closest('li'); if (li) { cur = +li.dataset.i; renderList(); renderEditor(); } };
+document.querySelectorAll('.filter [data-f]').forEach((b) => (b.onclick = () => { filter = b.dataset.f; renderList(); }));
+$('addbtn').onclick = () => { $('editor').hidden = true; $('addview').hidden = false; $('newraw').focus(); };
+$('addcancel').onclick = renderEditor;
+$('addsave').onclick = async () => {
+  try { const item = await api('/api/add', { raw: $('newraw').value }); $('newraw').value = '';
+    S.items.push(item); cur = S.items.length - 1; renderList(); renderEditor(); poll(); toast('added; S1-mini running');
+  } catch (e) { toast('add failed: ' + e.message); }
+};
+document.addEventListener('keydown', (e) => {
+  if ($('editor').hidden) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save(); }
+  else if (e.altKey && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); $('accept').click(); }
+  else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); cur = Math.min(S.items.length - 1, cur + 1); renderList(); renderEditor(); }
+  else if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); cur = Math.max(0, cur - 1); renderList(); renderEditor(); }
+});
+load();
+</script>
+</body>
+</html>

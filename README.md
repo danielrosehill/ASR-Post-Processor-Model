@@ -10,7 +10,8 @@ a sentence said to someone at the door. The output is the same text with those f
 changed. Restyling, restructuring and reformatting are a separate, later step.
 
 **Status (2026-10-16): planning.** No data, no model yet. The chosen approach is a LoRA fine-tune of
-[S1-mini by Superwhisper](https://huggingface.co/superwhisper/s1-mini); the training script is set up and smoke-tested.
+[S1-mini by Superwhisper](https://huggingface.co/superwhisper/s1-mini); the training data is about 100 triples of raw dictation, S1-mini's output and a hand edit, made in a local editor
+([decision 0002](docs/decisions/0002-triples-training-data.md)).
 Start with the [development plan](docs/development-plan.md), then [fine-tuning](docs/fine-tuning.md).
 
 ## Why a model and not a prompt or a regex
@@ -45,6 +46,10 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 | [`training/s1mini_lora.py`](training/s1mini_lora.py) | Self-contained train / infer / render script (runs on Hugging Face Jobs) |
 | [`scripts/pairs.py`](scripts/pairs.py) | Validate training-pair JSONL; rebuild the smoke-test set |
 | [`data/smoke/`](data/smoke/) | 17 pairs from the taxonomy examples, for smoke tests only |
+| [`docs/decisions/`](docs/decisions/) | Decision records (base model, training-data approach) |
+| [`tools/editor/`](tools/editor/) | Local GUI for making triples: raw, stock S1-mini output, your edit (`uv run tools/editor/server.py`) |
+| [`scripts/build_queue.py`](scripts/build_queue.py) | Builds the editor's queue of real raw dictation from public HF datasets |
+| [`data/triples/`](data/triples/) | Editor queue, cached S1-mini outputs, and the saved triples |
 | [`context/voice-note.mp3`](context/voice-note.mp3) | The original 17-minute voice note setting out the idea (2026-10-16) |
 | [`context/transcript-raw.txt`](context/transcript-raw.txt) | Its raw transcript (AssemblyAI Universal), unedited. Also a good long-form test input. |
 | [`project.json`](project.json) | Machine-readable project state |

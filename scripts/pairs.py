@@ -2,10 +2,13 @@
 
   python scripts/pairs.py validate data/smoke/taxonomy-examples.jsonl
   python scripts/pairs.py smoke > data/smoke/taxonomy-examples.jsonl
+  python scripts/pairs.py from-triples data/triples/triples.jsonl > data/triples/pairs.jsonl
 
 validate checks a JSONL file against the pair format in docs/spec.md and the ids in
 taxonomy/transformations.json. smoke rebuilds the smoke-test set from the taxonomy's
 own examples: enough to prove the training script runs end to end, nothing more.
+from-triples turns editor output (raw, S1-mini output, your edit) into training pairs:
+input = raw, output = your edit. Skipped items are dropped.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ TAXONOMY = json.loads((ROOT / "taxonomy" / "transformations.json").read_text())
 POSTPROCESSOR_IDS = {t["id"]: t for t in TAXONOMY["transformations"] if t["owner"] == "postprocessor"}
 
 CONTROLS = {"[Layers: 1]", "[Layers: 1,2]"}
-SOURCES = {"synthetic", "real-parakeet", "read-aloud-noop", "taxonomy-example"}
+SOURCES = {"synthetic", "real-parakeet", "real-other-asr", "read-aloud-noop", "taxonomy-example"}
 USE_CASES = {"message", "email", "note", "long"}
 REQUIRED = ("id", "source", "control", "input", "output", "applied")
 
@@ -75,9 +78,32 @@ def smoke() -> int:
     return 0
 
 
+def from_triples(path: str) -> int:
+    for t in map(json.loads, filter(str.strip, Path(path).read_text().splitlines())):
+        if t["verdict"] == "skipped" or t.get("final") is None:
+            continue
+        words = len(t["raw"].split())
+        row = {
+            "id": f"tri-{t['id']}",
+            "source": "real-parakeet" if "parakeet" in (t.get("asr") or "") else "real-other-asr",
+            "use_case": "message" if words < 40 else "long" if words > 150 else "note",
+            "control": t["control"],
+            "input": t["raw"],
+            "output": t["final"],
+            "applied": t.get("applied", []),
+            "asr_model": t.get("asr"),
+            "words_in": words,
+            "verdict": t["verdict"],
+        }
+        print(json.dumps(row, ensure_ascii=False))
+    return 0
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "smoke":
         sys.exit(smoke())
+    if len(sys.argv) == 3 and sys.argv[1] == "from-triples":
+        sys.exit(from_triples(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "validate":
         sys.exit(validate(sys.argv[2]))
     print(__doc__, file=sys.stderr)

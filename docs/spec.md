@@ -124,8 +124,8 @@ Each synthetic raw text yields two pairs, one per control line, with layer-2 tra
 ## Evaluation
 
 Evaluation set: the 40 real spontaneous Parakeet v2 clips from Phase 1, hand-cleaned at both layer settings,
-never trained on. Supplementary: [`Voice-Notes-Screened`](https://huggingface.co/datasets/danielrosehill/Voice-Notes-Screened) (real raw dictation, not Parakeet) for robustness, and
-[`context/transcript-raw.txt`](../context/transcript-raw.txt) as a single long-form stress test.
+never trained on. (`Voice-Notes-Screened` and `context/transcript-raw.txt`, previously supplementary evaluation
+inputs, became training data on 2026-10-16; see decision [0002](decisions/0002-triples-training-data.md).)
 
 Metrics, all computed per taxonomy id where the pair labels allow:
 

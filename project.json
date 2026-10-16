@@ -41,8 +41,9 @@
       "date": null
     },
     "data": {
-      "status": "todo",
-      "date": null
+      "status": "in_progress",
+      "date": null,
+      "result": "queue of 98 raw items built 2026-10-16; editing not started"
     },
     "baselines": {
       "status": "todo",
@@ -59,14 +60,15 @@
     }
   },
   "decisions": {
-    "training_data_approach": "A (synthetic clean-first pairs) calibrated on a small spontaneous-speech C set through Parakeet v2; B dropped. Reasoning: docs/development-plan.md#recommended-training-data-approach",
+    "training_data_approach": "~100 hand-edited triples (raw -> stock S1-mini -> speaker edit) from real public dictation; synthetic pairs optional augmentation. docs/decisions/0002-triples-training-data.md",
     "out_of_scope": [
       "homophones (asr-finetune)",
       "vocabulary/code-switching (asr-finetune)",
       "cross-utterance restart capitalisation",
       "headings/reordering/style (llm-pass)"
     ],
-    "base_model": "LoRA on superwhisper/s1-mini@88f6b15, S1 system prompt and control line kept, [Layers: 1|1,2] appended; Qwen/Qwen3-0.6B as control. docs/fine-tuning.md"
+    "base_model": "LoRA on superwhisper/s1-mini@88f6b15, S1 system prompt and control line kept, [Layers: 1|1,2] appended; Qwen/Qwen3-0.6B as control. docs/fine-tuning.md",
+    "records": "docs/decisions/"
   },
   "links": {
     "github": "https://github.com/danielrosehill/ASR-Post-Processor-Model",
@@ -97,11 +99,12 @@
     "intent": "public",
     "shape": "tracker-then-model"
   },
-  "resume": "docs/development-plan.md#phases",
+  "resume": "docs/decisions/0002-triples-training-data.md#workflow",
   "notes": "Taxonomy in taxonomy/transformations.json is the label set for training pairs.",
   "training": {
     "script": "training/s1mini_lora.py",
     "runner": "hf jobs uv run --flavor a10g-small",
-    "doc": "docs/fine-tuning.md"
+    "doc": "docs/fine-tuning.md",
+    "editor": "uv run tools/editor/server.py"
   }
 }
