@@ -15,7 +15,9 @@ Version 0.1, 2026-10-16. Draft for Phase 0 of [`development-plan.md`](developmen
   sentence of overlap by the caller; the model itself sees one chunk.
 - A control line selecting the layers to apply, adopting the pattern S1-mini uses
   (see [`research.md`](research.md#s1-mini-is-superwhisper-s1-mini)):
-  `[Layers: 1]` or `[Layers: 1,2]`. One model with a control line, not two models, is the default (fewest
+  `[Layers: 1]` or `[Layers: 1,2]`. On the wire it is appended to S1-mini's own pinned control line
+  (`[Styling: semi-formal] [Structure: prose] [Context: general] [Layers: 1]`); training pairs store only the
+  `[Layers: …]` part. Full prompt: [`fine-tuning.md`](fine-tuning.md#prompt-format). One model with a control line, not two models, is the default (fewest
   moving parts). Two separately trained variants are the fallback if the control line does not separate cleanly.
 
 **Output**
@@ -87,17 +89,15 @@ twice by that field; the unique count is given where the card states it.
 |---|---|---|---|
 | [`google/gemma-3-270m-it`](https://huggingface.co/google/gemma-3-270m-it) | 268M | Gemma terms | Smallest probe: does a model this size learn layer 1 at all? |
 | [`HuggingFaceTB/SmolLM2-360M-Instruct`](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) | 362M | Apache-2.0 | Alternative tiny probe with a permissive licence |
-| [`Qwen/Qwen3-0.6B`](https://huggingface.co/Qwen/Qwen3-0.6B) | 752M stored / 596M unique | Apache-2.0 | Same base as S1-mini, so results are directly comparable |
-| [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) | 873M | Apache-2.0 | **Recommended POC base.** Newest small Qwen (2026-02-28) |
+| [`superwhisper/s1-mini`](https://huggingface.co/superwhisper/s1-mini) | 752M stored / 596M unique | Apache-2.0 + naming clause | **Chosen POC base (2026-10-16).** See [`fine-tuning.md`](fine-tuning.md) |
+| [`Qwen/Qwen3-0.6B`](https://huggingface.co/Qwen/Qwen3-0.6B) | 752M stored / 596M unique | Apache-2.0 | Control run: S1-mini's base, so the comparison isolates S1-mini's cleanup training |
+| [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) | 873M | Apache-2.0 | Fallback. Newest small Qwen (2026-02-28) |
 | [`Qwen/Qwen3.5-2B`](https://huggingface.co/Qwen/Qwen3.5-2B) | 2.27B | Apache-2.0 | Step-up if 0.8B fails layer 2 |
 | [`google/flan-t5-base`](https://huggingface.co/google/flan-t5-base) | 248M | Apache-2.0 | Seq2seq control: encoder-decoder suits copy-heavy rewriting |
 
-Why Qwen3.5-0.8B first: Apache-2.0, a proven size for this task (S1-mini at 0.6B), newest in the family, and
-under the 1B size budget in `project.json`. Gemma 3 270M runs first as a cheap probe in the same training
-script; if it already passes layer 1, it wins on phone latency.
-
-Fine-tuning S1-mini itself is possible (its licence is Apache-2.0 plus a naming clause) and is worth one run:
-it starts already knowing fillers and self-corrections, so it may need fewer pairs.
+Decision (2026-10-16): LoRA on S1-mini, with the same LoRA on Qwen3-0.6B as the control. It starts already
+knowing fillers and self-corrections, is a proven size for this task, and is under the 1B budget in `project.json`.
+Gemma 3 270M, Qwen3.5-0.8B and the others are fallbacks if both runs fail the Phase 3 exit.
 
 ## Training data format
 
@@ -106,7 +106,7 @@ JSONL, one pair per line:
 ```json
 {
   "id": "syn-000123",
-  "source": "synthetic | real-parakeet | read-aloud-noop",
+  "source": "synthetic | real-parakeet | read-aloud-noop | taxonomy-example",
   "use_case": "message | email | note | long",
   "control": "[Layers: 1,2]",
   "input": "raw transcript text",
@@ -116,6 +116,8 @@ JSONL, one pair per line:
   "words_in": 182
 }
 ```
+
+`taxonomy-example` marks the smoke-test pairs only. Validate a file with `python scripts/pairs.py validate <file>`.
 
 Each synthetic raw text yields two pairs, one per control line, with layer-2 transformations applied only in the `[Layers: 1,2]` target.
 

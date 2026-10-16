@@ -9,8 +9,9 @@ but with fillers, false starts, *gonna*, no paragraph breaks, the odd repeated p
 a sentence said to someone at the door. The output is the same text with those fixed and nothing else
 changed. Restyling, restructuring and reformatting are a separate, later step.
 
-**Status (2026-10-16): planning.** No data, no model yet. Start with the
-[development plan](docs/development-plan.md).
+**Status (2026-10-16): planning.** No data, no model yet. The chosen approach is a LoRA fine-tune of
+[S1-mini by Superwhisper](https://huggingface.co/superwhisper/s1-mini); the training script is set up and smoke-tested.
+Start with the [development plan](docs/development-plan.md), then [fine-tuning](docs/fine-tuning.md).
 
 ## Why a model and not a prompt or a regex
 
@@ -40,6 +41,10 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 | [`docs/spec.md`](docs/spec.md) | Input/output contract, model candidates, evaluation method, out of scope |
 | [`docs/research.md`](docs/research.md) | Prior art: punctuation, disfluency, ASR error correction, paragraph segmentation, small base models |
 | [`taxonomy/transformations.json`](taxonomy/transformations.json) | Machine-readable layered taxonomy |
+| [`docs/fine-tuning.md`](docs/fine-tuning.md) | S1-mini LoRA: prompt format, data implications, run commands, licence, HF repos |
+| [`training/s1mini_lora.py`](training/s1mini_lora.py) | Self-contained train / infer / render script (runs on Hugging Face Jobs) |
+| [`scripts/pairs.py`](scripts/pairs.py) | Validate training-pair JSONL; rebuild the smoke-test set |
+| [`data/smoke/`](data/smoke/) | 17 pairs from the taxonomy examples, for smoke tests only |
 | [`context/voice-note.mp3`](context/voice-note.mp3) | The original 17-minute voice note setting out the idea (2026-10-16) |
 | [`context/transcript-raw.txt`](context/transcript-raw.txt) | Its raw transcript (AssemblyAI Universal), unedited. Also a good long-form test input. |
 | [`project.json`](project.json) | Machine-readable project state |
@@ -59,6 +64,12 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 - [Text-Transformation-Prompts-300525](https://huggingface.co/datasets/danielrosehill/Text-Transformation-Prompts-300525)
   (HF dataset): the system-prompt library for the layer-3 reformatting pass.
 
+## Hugging Face repos for this project
+
+- [S1-mini-Parakeet-Cleanup-LoRA](https://huggingface.co/danielrosehill/S1-mini-Parakeet-Cleanup-LoRA): adapter output (placeholder).
+- [Parakeet-Dictation-Cleanup-Pairs](https://huggingface.co/datasets/danielrosehill/Parakeet-Dictation-Cleanup-Pairs): training pairs (placeholder).
+- [Parakeet-Dictation-Cleanup-Eval](https://huggingface.co/datasets/danielrosehill/Parakeet-Dictation-Cleanup-Eval): the 40-clip real evaluation set, never trained on (placeholder).
+
 ## Licence
 
-To be decided at first release.
+To be decided at first release. A published adapter inherits S1-mini's licence (Apache 2.0 plus a naming clause); see [fine-tuning](docs/fine-tuning.md#licence-obligations).

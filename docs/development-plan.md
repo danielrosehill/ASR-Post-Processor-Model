@@ -130,11 +130,13 @@ Run all of these on the 40-clip real eval set, scored with the metrics in [`spec
 
 ### Phase 3: POC fine-tune
 
-- Base model: Gemma 3 270M as a cheap probe, then Qwen3.5-0.8B (see [`spec.md`](spec.md#model-candidates)),
-  LoRA, 400 synthetic + 50 no-op pairs. One model, two control lines (`[Layers: 1]`, `[Layers: 1,2]`), the
-  pattern S1-mini uses. Separately trained L1 and L1+L2 variants are the fallback.
-- One extra run: LoRA on top of S1-mini itself, to see whether starting from a cleanup model needs fewer pairs.
-- Train on a rented or hosted GPU; the laptop has no ML accelerator.
+- Base model: **S1-mini** (decided 2026-10-16), LoRA, 400 synthetic + 50 no-op pairs. S1-mini's system prompt and
+  control line are kept verbatim and pinned to `semi-formal` / `prose` / `general`; the fine-tune appends a
+  `[Layers: 1]` or `[Layers: 1,2]` axis. Separately trained L1 and L1+L2 adapters are the fallback.
+  Format, the places where S1-mini's training fights this spec, and run commands: [`fine-tuning.md`](fine-tuning.md).
+- Control run: the same LoRA on `Qwen/Qwen3-0.6B` (S1-mini's base), to measure what S1-mini's prior is worth.
+  Gemma 3 270M and Qwen3.5-0.8B are now fallbacks, used only if both fail.
+- Train on Hugging Face Jobs (`a10g-small`); the laptop has no ML accelerator. Script: [`../training/s1mini_lora.py`](../training/s1mini_lora.py).
 - Exit: the `[Layers: 1]` output beats B2 and B3 on edit F1 and does not exceed 1% word changes on no-op inputs. If the
   smallest base fails, step up one size once before re-planning.
 
@@ -151,6 +153,12 @@ Run all of these on the 40-clip real eval set, scored with the metrics in [`spec
 - Export (GGUF or ONNX) and test as a post-processor in daily dictation. Confirm what Whisperian's
   post-processing step accepts before choosing the format (open question below).
 - Scale data only if daily use shows a gap the POC set did not cover.
+
+## Decision log
+
+- **2026-10-16: fine-tune S1-mini rather than a general small base.** The speaker's call after the prior-art
+  review. S1-mini already covers most of layer 1, is on-device sized, and should need fewer pairs. The Qwen3-0.6B
+  control run keeps the comparison honest. Recorded in [`fine-tuning.md`](fine-tuning.md).
 
 ## Open questions
 
