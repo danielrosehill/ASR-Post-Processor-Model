@@ -1,0 +1,267 @@
+{
+  "schema": 1,
+  "name": "asr-post-processor-transformations",
+  "updated": "2026-10-16",
+  "source": "context/transcript-raw.txt (voice note dictated 2026-10-16), refined in docs/spec.md",
+  "input_assumption": "Raw output of nvidia/parakeet-tdt-0.6b-v2 (via the Whisperian Android app): already punctuated and cased, numbers mostly normalised, no paragraph breaks.",
+  "owners": {
+    "postprocessor": "This model. Text in, text out, meaning preserved.",
+    "asr-finetune": "Fixed by fine-tuning the ASR model, because the audio is needed to decide (homophones, vocabulary, code-switched words).",
+    "llm-pass": "A later, optional, system-prompted LLM pass that reshapes the text for a target format or style. Not this model's job.",
+    "out-of-scope": "Not handled anywhere in this project, or already handled by the ASR model or a deterministic regex pass."
+  },
+  "layers": {
+    "1": "Foundational. Every output gets these. Safe for a WhatsApp message and a 2,000-word report alike.",
+    "2": "Light editorial cleanup. Still meaning-preserving, but involves judgement about what the speaker meant to keep. Shipped as a separate model variant or flag so it can be A/B tested for going too far.",
+    "3": "Editing proper: restructure, restyle, reformat. Owned by the llm-pass, listed only to mark the boundary."
+  },
+  "fields": {
+    "id": "Stable identifier; used as a label in training data (which transformations were applied to a pair).",
+    "layer": "1, 2 or 3; null for items owned outside the post-processor.",
+    "owner": "One of the keys in owners.",
+    "regex_coverage": "none | partial | full: how much of it a deterministic pass in danielrosehill/ASR-Regex-Post-Processing can already do.",
+    "status": "in-scope | experimental (in scope for an A/B test, may be dropped) | excluded"
+  },
+  "transformations": [
+    {
+      "id": "L1.filler-removal",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "partial",
+      "description": "Delete filled pauses and filler words (um, uh, erm) and filler uses of 'like' / 'you know' that carry no meaning. Regex handles the unambiguous tokens; the model handles the context-dependent ones ('like' as a verb or comparison stays).",
+      "example": {
+        "raw": "So, um, I was, like, thinking we could move the call to Thursday.",
+        "clean": "So I was thinking we could move the call to Thursday."
+      }
+    },
+    {
+      "id": "L1.stutter-repetition",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "partial",
+      "description": "Collapse immediate word or short-phrase repetition produced while speaking ('the the', 'in the. In the. In the').",
+      "example": {
+        "raw": "I think those should definitely be included in the. In the. In the. In the transcription.",
+        "clean": "I think those should definitely be included in the transcription."
+      }
+    },
+    {
+      "id": "L1.false-start-repair",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "none",
+      "description": "Remove an abandoned start (the reparandum) when the speaker immediately restarts the same clause. Keep only the completed version.",
+      "example": {
+        "raw": "The reason I think I'm. I'm underscoring this is to say that it can't be too deterministic.",
+        "clean": "The reason I'm underscoring this is to say that it can't be too deterministic."
+      }
+    },
+    {
+      "id": "L1.informal-contractions",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "partial",
+      "description": "Expand informal spoken contractions to their written form: gonna -> going to, wanna -> want to, gotta -> have to / got to, kinda -> kind of, sorta -> sort of, lemme -> let me, dunno -> don't know. Standard contractions (I'm, don't, it's) are kept. Regex can do gonna/wanna; gotta and 'gonna' before a noun need context.",
+      "example": {
+        "raw": "I'm gonna go get some beer from the fridge.",
+        "clean": "I'm going to go get some beer from the fridge."
+      }
+    },
+    {
+      "id": "L1.pause-induced-sentence-breaks",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "none",
+      "description": "Parakeet v2 often ends a sentence at a mid-clause pause, producing a fragment and a spurious capital ('One failure pattern. Is that the way I use it', from context/transcript-raw.txt). Within one transcript the model can see both halves, so it rejoins them. Different from L-out.cross-utterance-restart, where the halves are in separate ASR sessions.",
+      "example": {
+        "raw": "One failure pattern. Is that I start a sentence, stop, and continue it.",
+        "clean": "One failure pattern is that I start a sentence, stop, and continue it."
+      }
+    },
+    {
+      "id": "L1.paragraph-boundaries",
+      "layer": 1,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "none",
+      "description": "Insert paragraph breaks (blank line) at topic or thought shifts in long dictation. Target style: short paragraphs, one thought each (the speaker's preference, configurable later). Text under roughly 60 words stays one paragraph. Requires long training examples (30 s+ of speech, 80+ words), because short ones never contain a boundary.",
+      "example": {
+        "raw": "Hi Sarah, thanks for sending the contract over. I've read through it and it looks fine apart from clause four. On a separate note, are you free next Tuesday for the site visit? I can do any time after ten.",
+        "clean": "Hi Sarah, thanks for sending the contract over. I've read through it and it looks fine apart from clause four.\n\nOn a separate note, are you free next Tuesday for the site visit? I can do any time after ten."
+      }
+    },
+    {
+      "id": "L2.content-repetition",
+      "layer": 2,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "none",
+      "description": "Remove a point the speaker restates in the same breath with no added information. Distinct from L1.stutter-repetition by span length: here it is a clause or sentence, not a word.",
+      "example": {
+        "raw": "Today's to-do list is I need to pick up a parcel from the post office. I need to pick up a parcel from the post office and I also need to go to the pharmacy.",
+        "clean": "Today's to-do list: I need to pick up a parcel from the post office, and I also need to go to the pharmacy."
+      }
+    },
+    {
+      "id": "L2.spoken-self-correction",
+      "layer": 2,
+      "owner": "postprocessor",
+      "status": "in-scope",
+      "regex_coverage": "partial",
+      "description": "Apply an explicit spoken correction and drop the corrected material: 'Tuesday, no, sorry, Wednesday', 'I mean', 'scratch that'. 'Scratch that' at the end of a sentence is a regex candidate in ASR-Regex-Post-Processing; mid-sentence corrections need the model.",
+      "example": {
+        "raw": "Let's meet on Tuesday, no, sorry, Wednesday at three.",
+        "clean": "Let's meet on Wednesday at three."
+      }
+    },
+    {
+      "id": "L2.non-directed-speech",
+      "layer": 2,
+      "owner": "postprocessor",
+      "status": "experimental",
+      "regex_coverage": "none",
+      "description": "Delete speech plainly addressed to someone else in the room, not to the transcript (signing for a delivery, answering a family member). The literature term is addressee detection / device-directed speech detection (see docs/research.md). Experimental: deletion is the costliest error class, so precision matters more than recall. If the POC shows the model deletes real content, this moves to llm-pass.",
+      "example": {
+        "raw": "We need to upgrade to the latest version of the API. Sure, come in. Thanks a lot, Jim. Leave the door closed. Where was I? The old version is deprecated in March.",
+        "clean": "We need to upgrade to the latest version of the API. The old version is deprecated in March."
+      }
+    },
+    {
+      "id": "L2.train-of-thought-recovery",
+      "layer": 2,
+      "owner": "postprocessor",
+      "status": "experimental",
+      "regex_coverage": "none",
+      "description": "Delete self-directed recovery phrases that are not content: 'where was I?', 'what was I saying', 'hang on'. Usually co-occurs with L2.non-directed-speech.",
+      "example": {
+        "raw": "The invoice is due Friday. Hang on. Where was I? Right, the invoice is due Friday and it covers both months.",
+        "clean": "The invoice is due Friday, and it covers both months."
+      }
+    },
+    {
+      "id": "L2.verbal-hedges",
+      "layer": 2,
+      "owner": "postprocessor",
+      "status": "experimental",
+      "regex_coverage": "none",
+      "description": "Thin out habitual hedges and discourse markers ('kind of', 'sort of', 'basically', 'I guess', sentence-initial 'So,' / 'Okay, so') when they are tics rather than meaning. High risk of flattening the speaker's voice; kept only if the A/B test says it reads better.",
+      "example": {
+        "raw": "So basically I kind of think we should, I guess, just ship it on Monday.",
+        "clean": "I think we should just ship it on Monday."
+      }
+    },
+    {
+      "id": "L3.headings-and-structure",
+      "layer": 3,
+      "owner": "llm-pass",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Add headings, bullet lists or sections to long dictation.",
+      "example": {
+        "raw": "First the budget is approved. Second the vendor is picked. Third we schedule the install.",
+        "clean": "## Next steps\n\n1. Budget approved.\n2. Vendor picked.\n3. Install scheduled."
+      }
+    },
+    {
+      "id": "L3.reordering",
+      "layer": 3,
+      "owner": "llm-pass",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Move material so related points sit together when the speaker jumped between topics.",
+      "example": {
+        "raw": "The API needs upgrading. Also I need to book flights. Back to the API, it breaks on the old SDK.",
+        "clean": "The API needs upgrading; it breaks on the old SDK.\n\nI also need to book flights."
+      }
+    },
+    {
+      "id": "L3.style-and-formality",
+      "layer": 3,
+      "owner": "llm-pass",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Make it more formal, polished, concise, or fit a format (business email, blog outline). This is what danielrosehill/Text-Transformation-Prompts-300525 does with system prompts.",
+      "example": {
+        "raw": "Hey, just checking if you got the thing I sent yesterday.",
+        "clean": "Dear Mr Cohen, I am writing to confirm that you received the document I sent yesterday."
+      }
+    },
+    {
+      "id": "X.homophones",
+      "layer": null,
+      "owner": "asr-finetune",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Wrong spelling of a homophone (their/there, write/right, Parakeet errors seen in daily use). The text model cannot hear the audio and would have to guess from context; the ASR fine-tune can learn the speaker's acoustics. The Read-Aloud-Voice-Sentences dataset already has a homophone category for this.",
+      "example": {
+        "raw": "I need to right the report tonight.",
+        "clean": "I need to write the report tonight."
+      }
+    },
+    {
+      "id": "X.vocabulary-and-code-switching",
+      "layer": null,
+      "owner": "asr-finetune",
+      "status": "excluded",
+      "regex_coverage": "partial",
+      "description": "Misrecognised domain vocabulary, product names and Hebrew words in English speech (makolet -> 'Micollette'). Owned by English-Hebrew-Codeswitching-Parakeet-Finetune and the vocabulary fine-tune. A regex replacement list can patch the few most frequent errors.",
+      "example": {
+        "raw": "I want to go to the Micollette today.",
+        "clean": "I want to go to the makolet today."
+      }
+    },
+    {
+      "id": "X.cross-utterance-restart",
+      "layer": null,
+      "owner": "out-of-scope",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Whisperian has no pause button, so the speaker stops and restarts mid-sentence; the second recording starts with a capital letter. The post-processor only sees one recording at a time and cannot know the previous one ended mid-sentence. Ruled out in the voice note. A fix would live in the app (pass the preceding text as context), not here.",
+      "example": {
+        "raw": "[recording 1] I wanted to ask whether [recording 2] You could send the file by Friday.",
+        "clean": "I wanted to ask whether you could send the file by Friday."
+      }
+    },
+    {
+      "id": "X.punctuation-casing-from-scratch",
+      "layer": null,
+      "owner": "out-of-scope",
+      "status": "excluded",
+      "regex_coverage": "none",
+      "description": "Full punctuation and truecasing restoration of unpunctuated lowercase ASR output. Parakeet v2 already emits punctuation and casing, so the model only repairs errors (L1.pause-induced-sentence-breaks). If a non-punctuating ASR is ever used upstream, a dedicated punctuation model goes in front (see docs/research.md).",
+      "example": {
+        "raw": "can you send me the file by friday thanks",
+        "clean": "Can you send me the file by Friday? Thanks."
+      }
+    },
+    {
+      "id": "X.spoken-formatting-commands",
+      "layer": null,
+      "owner": "out-of-scope",
+      "status": "excluded",
+      "regex_coverage": "full",
+      "description": "Spoken punctuation and layout commands ('comma', 'full stop', 'new paragraph'). Deterministic; belongs in the regex pre-pass (listed under ideas in ASR-Regex-Post-Processing).",
+      "example": {
+        "raw": "Thanks new paragraph see you Monday full stop",
+        "clean": "Thanks\n\nSee you Monday."
+      }
+    },
+    {
+      "id": "X.number-and-entity-formatting",
+      "layer": null,
+      "owner": "out-of-scope",
+      "status": "excluded",
+      "regex_coverage": "partial",
+      "description": "Inverse text normalisation: 'three thirty pm' -> '3:30 pm', 'jane at example dot com' -> an email address. Parakeet v2 already does most of it; residual cases are regex. Training pairs must not change numbers, so the model learns to leave them alone.",
+      "example": {
+        "raw": "Call me at three thirty pm.",
+        "clean": "Call me at 3:30 pm."
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "name": "asr-post-processor-model",
+  "title": "Light-touch text-in/text-out cleanup of raw Parakeet v2 dictation",
+  "created": "2026-10-16",
+  "updated": "2026-10-16",
+  "status": "planning",
+  "stage": "spec",
+  "verdict": null,
+  "task": {
+    "pipeline_tag": "text-generation",
+    "modality": "text",
+    "languages": ["en"],
+    "input": "raw nvidia/parakeet-tdt-0.6b-v2 transcript (punctuated, cased, single block)",
+    "output": "cleaned text, same wording, paragraph breaks as blank lines",
+    "deployment": "on-device post-processor (Whisperian on Android) to be confirmed; server fallback",
+    "size_budget_params": 1000000000
+  },
+  "stages": {
+    "exists_check": {"status": "done", "date": "2026-10-16", "result": "partial"},
+    "framing": {"status": "done", "date": "2026-10-16"},
+    "prior_art": {"status": "done", "date": "2026-10-16"},
+    "approaches": {"status": "done", "date": "2026-10-16"},
+    "spec": {"status": "in_progress", "date": null},
+    "data": {"status": "todo", "date": null},
+    "baselines": {"status": "todo", "date": null},
+    "base_model": {"status": "todo", "date": null},
+    "evaluation": {"status": "todo", "date": null}
+  },
+  "decisions": {
+    "training_data_approach": "A (synthetic clean-first pairs) calibrated on a small spontaneous-speech C set through Parakeet v2; B dropped. Reasoning: docs/development-plan.md#recommended-training-data-approach",
+    "out_of_scope": ["homophones (asr-finetune)", "vocabulary/code-switching (asr-finetune)", "cross-utterance restart capitalisation", "headings/reordering/style (llm-pass)"]
+  },
+  "links": {
+    "github": "https://github.com/danielrosehill/ASR-Post-Processor-Model",
+    "related_github": [
+      "https://github.com/danielrosehill/ASR-Regex-Post-Processing",
+      "https://github.com/danielrosehill/English-Hebrew-Codeswitching-Parakeet-Finetune"
+    ],
+    "hf_models": [],
+    "hf_datasets": [
+      "danielrosehill/Transcription-Cleanup-Trainer",
+      "danielrosehill/Read-Aloud-Voice-Sentences",
+      "danielrosehill/Voice-Notes-Screened",
+      "danielrosehill/Text-Transformation-Prompts-300525"
+    ]
+  },
+  "release": {"intent": "public", "shape": "tracker-then-model"},
+  "resume": "docs/development-plan.md#phases",
+  "notes": "Taxonomy in taxonomy/transformations.json is the label set for training pairs."
+}
