@@ -58,7 +58,7 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 
 - [ASR-Regex-Post-Processing](https://github.com/danielrosehill/ASR-Regex-Post-Processing): Android-safe
   (ICU) regex snippets for ASR cleanup. The deterministic pass that runs before this model.
-- [English-Hebrew-Codeswitching-Parakeet-Finetune](https://github.com/danielrosehill/English-Hebrew-Codeswitching-Parakeet-Finetune):
+- [English-Hebrew-Codeswitching-Parakeet-Finetune](https://github.com/Hebrish-ASR/English-Hebrew-Codeswitching-Parakeet-Finetune):
   the ASR-side fine-tune. Vocabulary and code-switching errors belong there, not here.
 - [Transcription-Cleanup-Trainer](https://huggingface.co/datasets/danielrosehill/Transcription-Cleanup-Trainer)
   (HF dataset, 2025-12-18): an earlier start on the same problem; one completed raw/cleaned sample.
