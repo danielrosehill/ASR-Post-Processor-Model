@@ -56,6 +56,8 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 
 ## Related work
 
+- [ASR-Paragraph-Breaks](https://github.com/danielrosehill/ASR-Paragraph-Breaks) (2026-10-21):
+  `L1.paragraph-boundaries` spun out as its own hand-annotated dataset and paragraph-only model.
 - [ASR-Regex-Post-Processing](https://github.com/danielrosehill/ASR-Regex-Post-Processing): Android-safe
   (ICU) regex snippets for ASR cleanup. The deterministic pass that runs before this model.
 - [English-Hebrew-Codeswitching-Parakeet-Finetune](https://github.com/Hebrish-ASR/English-Hebrew-Codeswitching-Parakeet-Finetune):
