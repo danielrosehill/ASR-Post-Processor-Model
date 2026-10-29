@@ -24,7 +24,7 @@ fill     Daniel's history has no emails or calendar entries and few messages (20
          register, a fifth of them clean (counterexamples). -> data/private/fill.jsonl
 draft    Haiku's proposed clean-up of every item, under the contract in docs/spec.md with [Layers: 1,2].
          Unchanged input is a valid answer and is expected for clean items. -> data/private/drafts.jsonl
-pool     Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
+pool     Leaves out items removed in the Space (removed/<id>.json on the dataset). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
          the history items are obfuscated). Annotation is in a private Space.
 
 All Haiku calls go through Message Batches (half price; usually minutes). data/private/ is gitignored
@@ -41,6 +41,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -257,13 +258,26 @@ def draft() -> None:
     write("drafts.jsonl", read("drafts.jsonl") + [{"id": i, "draft": d, "draft_model": MODEL} for i, d in res.items()])
 
 
+def removed_ids() -> set[str]:
+    req = urllib.request.Request(f"https://huggingface.co/api/datasets/{DATASET}/tree/main/removed",
+                                 headers={"Authorization": f"Bearer {os.environ.get('HF_TOKEN', '')}"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return {Path(f["path"]).stem for f in json.loads(r.read())}
+    except urllib.error.HTTPError as e:  # 404 until the first removal
+        if e.code == 404:
+            return set()
+        raise
+
+
 def pool(upload: bool) -> None:
     drafts = {d["id"]: d for d in read("drafts.jsonl")}
     s1 = {d["id"]: d for d in read("s1.jsonl")}  # scripts/s1_modal.py; the annotator starts from it
+    removed = removed_ids()  # marked invalid in the Space (removed/<id>.json)
     rows = []
     for it in read("history.jsonl") + read("vocab.jsonl") + read("fill.jsonl"):
         d = drafts.get(it["id"])
-        if d is None:
+        if d is None or it["id"] in removed:
             continue
         rows.append({**it, "control": CONTROL, "draft": d["draft"], "draft_model": d["draft_model"],
                      "draft_unchanged": d["draft"] == it["input"],

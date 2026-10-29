@@ -35,9 +35,13 @@ POOL = load_pool()
 BY_ID = {r["id"]: r for r in POOL}
 
 
-def done_ids() -> set[str]:
+def repo_ids(files: list[str], folder: str, ext: str) -> set[str]:
+    return {f[len(folder) + 1:-len(ext)] for f in files if f.startswith(folder + "/") and f.endswith(ext)}
+
+
+def done_ids() -> tuple[set[str], set[str]]:
     files = api.list_repo_files(DATASET, repo_type="dataset")
-    return {f[len("annotations/"):-len(".jsonl")] for f in files if f.startswith("annotations/") and f.endswith(".jsonl")}
+    return repo_ids(files, "annotations", ".jsonl"), repo_ids(files, "removed", ".json")
 
 
 def diff_html(a: str, b: str) -> str:
@@ -55,13 +59,13 @@ def diff_html(a: str, b: str) -> str:
 
 
 def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
-    done = done_ids()
-    todo = [r for r in POOL if r["id"] not in done and r["id"] not in skipped]
+    done, removed = done_ids()
+    todo = [r for r in POOL if r["id"] not in done and r["id"] not in removed and r["id"] not in skipped]
     counts: dict[str, int] = {}
     for i in done:
         if i in BY_ID:
             counts[BY_ID[i]["use_case"]] = counts.get(BY_ID[i]["use_case"], 0) + 1
-    progress = (f"**{len(done)}** annotated of {len(POOL)} · "
+    progress = (f"**{len(done)}** annotated of {len(POOL) - len(removed & set(BY_ID))} · {len(removed)} removed · "
                 + " · ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     if not todo:
         return None, progress
@@ -120,6 +124,21 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
     return (*show(*pick_next(skipped or [])), skipped, False)
 
 
+def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
+    if profile is None or oauth_token is None:
+        raise gr.Error("Sign in with Hugging Face first.")
+    if not item_id:
+        raise gr.Error("No item loaded.")
+    record = {"id": item_id, "removed_by": profile.username,
+              "removed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    HfApi(token=oauth_token.token).upload_file(
+        path_or_fileobj=json.dumps(record).encode("utf-8"), path_in_repo=f"removed/{item_id}.json",
+        repo_id=DATASET, repo_type="dataset", commit_message=f"Remove {item_id} (invalid)",
+    )
+    gr.Info(f"Removed {item_id}.")
+    return (*show(*pick_next(skipped or [])), skipped)
+
+
 def on_save(item_id, output, skipped, force, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
     return save(item_id, output, skipped, force, profile, oauth_token)
 
@@ -133,7 +152,8 @@ with gr.Blocks(title="ASR Clean-up Annotator") as demo:
         "# ASR clean-up: before → after\n"
         "**Original** is the raw transcript; **S1-mini** is stock S1-mini's clean-up with its changes marked; "
         "**Your edit** starts as S1-mini's text: fix it into the output you want, then **Save & next**. "
-        "**No change needed** saves the original as the answer; **Load Haiku draft** swaps in Haiku's version. "
+        "**No change needed** saves the original as the answer; **Load Haiku draft** swaps in Haiku's version; "
+        "**Remove (invalid)** drops the item from the dataset. "
         f"Saves go to [`{DATASET}`](https://huggingface.co/datasets/{DATASET})."
     )
     gr.LoginButton()
@@ -154,12 +174,14 @@ with gr.Blocks(title="ASR Clean-up Annotator") as demo:
         reset_btn = gr.Button("Reset to S1-mini")
         haiku_btn = gr.Button("Load Haiku draft")
         skip_btn = gr.Button("Skip")
+        remove_btn = gr.Button("Remove (invalid)", variant="stop")
         force = gr.Checkbox(label="Save anyway (protected term removed on purpose)", value=False)
 
     outs = [item_id, original, s1, after, meta, progress]
     demo.load(on_load, [skipped], outs)
     save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force])
     same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force])
+    remove_btn.click(on_remove, [item_id, skipped], outs + [skipped])
     skip_btn.click(on_skip, [item_id, skipped], outs + [skipped])
     reset_btn.click(lambda i: start(BY_ID[i]) if i else "", [item_id], [after])
     haiku_btn.click(lambda i: BY_ID[i]["draft"] if i else "", [item_id], [after])
