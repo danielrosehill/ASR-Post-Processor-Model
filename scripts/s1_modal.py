@@ -55,7 +55,7 @@ def generate(texts: list[str]) -> list[str]:
 def main():
     hist = "history2.jsonl" if (PRIVATE / "history2.jsonl").exists() else "history.jsonl"  # before_after.py rewrite
     items = [json.loads(l) for f in [hist, "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted((ROOT / "data" / "synth").glob("*.json"))]
-             + [f"target-{p.stem}.jsonl" for p in sorted((ROOT / "data" / "targets").glob("*.json"))] if (PRIVATE / f).exists()
+             + [f"target-{p.stem}.jsonl" for p in sorted((ROOT / "data" / "targets").glob("*.json"))] + ["capitals.jsonl"] if (PRIVATE / f).exists()
              for l in (PRIVATE / f).read_text(encoding="utf-8").splitlines()]
     path = PRIVATE / "s1.jsonl"
     have = {json.loads(l)["id"] for l in path.read_text().splitlines()} if path.exists() else set()

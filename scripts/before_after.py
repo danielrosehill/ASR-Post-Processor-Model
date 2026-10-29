@@ -279,7 +279,7 @@ def sources() -> list[dict]:
     """Every pool item: history, vocab and the synthetic rounds (fill.jsonl, then data/synth/<tag>.json order)."""
     hist = "history2.jsonl" if (PRIVATE / "history2.jsonl").exists() else "history.jsonl"  # `rewrite`
     return [r for f in [hist, "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted(SYNTH.glob("*.json"))]
-            + [f"target-{p.stem}.jsonl" for p in sorted(TARGETS.glob("*.json"))]
+            + [f"target-{p.stem}.jsonl" for p in sorted(TARGETS.glob("*.json"))] + ["capitals.jsonl"]
             for r in read(f)]
 
 
@@ -704,6 +704,19 @@ def ordinal_to_int(o: str) -> int | None:
     return n + ORDINALS.index(unit) + 1 if unit in ORDINALS else words_to_int(o)
 
 
+def added_words(raw: str, out: str) -> list[str]:
+    """Content words in `out` that are nowhere in `raw`, for flagging drafts that add text. Contraction expansions,
+    digits, currency and a few joining words are expected and not listed."""
+    norm = lambda x: re.findall(r"[a-z][a-z']*", x.lower())
+    have = set(norm(raw)) | set(norm(" ".join(CONTRACTION_WORDS)))
+    return sorted({w for w in norm(out) if w not in have and w not in EXPECTED_NEW})
+
+
+CONTRACTION_WORDS = ["going to want have got kind sort of let me give don't know because out lot ought trying come on them you",
+                     "should could would must what do have"]
+EXPECTED_NEW = set("nis million billion trillion am pm st nd rd th and but so the a an is are was it's that which this to of in on at for with as or i".split())
+
+
 def tidy(t: str | None) -> str | None:
     """Deterministic fixes Daniel makes by hand, applied to the drafts the edit box starts from:
     "11 percent" / "eleven percent" -> "11%"; "the 12th of March", "March the twelfth", "March 12th" ->
@@ -783,16 +796,21 @@ def pool(upload: bool) -> None:
         d = drafts.get(it["id"])
         if d is None and "target_output" in it:  # `target` items have no Haiku draft; the cleaned output stands in
             d = {"draft": it["target_output"], "draft_model": it["target_models"][1]}
+        if d is None and it["id"].startswith("cap-"):  # `capitals`: the de-capitalised sentence stands in
+            d = {"draft": it["carried_output"], "draft_model": it["model"]}
         if d is None or it["id"] in removed or COMMAND.search(it["input"]):
             continue
         if it["id"].startswith("hist2-") and "carried_output" not in it and it["id"] not in adapted:  # `pairs` only
             continue
         a = {k: tidy(v) if k == "adapted" else v for k, v in adapted.get(it["id"], {}).items() if k != "id"}
         if "carried_output" in it:  # `rewrite`: his edit of the old item, transposed; the Space starts from it
-            a = {"adapted": it["carried_output"], "adapt_model": MODEL, "adapt_round": f"carried from {it['carried_from']}"}
+            a = ({"adapted": it["carried_output"], "adapt_model": MODEL, "adapt_round": f"carried from {it['carried_from']}"}
+                 if "carried_from" in it else {"adapted": it["carried_output"], "adapt_model": it.get("model"), "adapt_round": it["source"]})
         if "target_output" in it:  # `target`: written to the spec's rule
             a = {"adapted": it["target_output"], "adapt_model": it["target_models"][1], "adapt_round": f"target {it['target']}"}
-        a["review"] = it["id"].startswith(("hist2-", "tgt-"))  # the Space serves these first
+        a["review"] = it["id"].startswith(("hist2-", "tgt-", "cap-"))  # the Space serves these first
+        if a["review"] and a.get("adapted"):  # words the draft adds (S1-ASR-Cleanup v1.0 learned to invent text, 2026-10-29)
+            a["added_words"] = added_words(it["input"], a["adapted"])
         rows.append({**it, "control": CONTROL, "draft": tidy(d["draft"]), "draft_model": d["draft_model"],
                      "draft_unchanged": d["draft"] == it["input"],
                      "s1": s1.get(it["id"], {}).get("s1"), "s1_model": s1.get(it["id"], {}).get("s1_model"),

@@ -25,7 +25,7 @@ import threading
 from datetime import datetime, timezone
 
 import gradio as gr
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
 DATASET = os.environ.get("DATASET_REPO", "danielrosehill/ASR-Cleanup-Before-After")
 api = HfApi()
@@ -50,6 +50,10 @@ def repo_ids(files: list[str], folder: str, ext: str) -> set[str]:
 # background worker in order; a failed commit is retried and reported on the next action.
 _files = api.list_repo_files(DATASET, repo_type="dataset")
 DONE, REMOVED = repo_ids(_files, "annotations", ".jsonl"), repo_ids(_files, "removed", ".json")
+# Saved annotations, for "Revisit saved" (Daniel, 2026-10-29: edit the pairs v1.0 was trained on, to tighten the next one)
+_ann = snapshot_download(DATASET, repo_type="dataset", allow_patterns=["annotations/*.jsonl"])
+SAVED = {r["id"]: r for f in sorted(os.listdir(os.path.join(_ann, "annotations")))
+         for r in [json.loads(open(os.path.join(_ann, "annotations", f), encoding="utf-8").read())]}
 UPLOADS: queue.Queue = queue.Queue()
 FAILED: list[str] = []
 
@@ -138,7 +142,20 @@ COPY_JS = """
 """
 
 
-def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
+def pick_revisit(skipped: list[str]) -> tuple[dict | None, str]:
+    """Saved pairs, oldest first, starting from the saved edit; each is served once per session."""
+    todo = sorted((r for i, r in SAVED.items() if i not in skipped and i not in REMOVED and not i.startswith("hist-")),
+                  key=lambda r: r["annotated_at"])  # hist-* train through their hist2-* rewrites
+    progress = f"Revisiting saved pairs: **{len(todo)}** left this session of {len(SAVED)}"
+    if not todo:
+        return None, progress
+    r = todo[0]
+    return {**BY_ID.get(r["id"], {}), **r, "adapted": r["output"], "adapt_round": "your saved edit", "revisit": True}, progress
+
+
+def pick_next(skipped: list[str], revisit: bool = False) -> tuple[dict | None, str]:
+    if revisit:
+        return pick_revisit(skipped)
     done, removed = done_ids()
     # hist-* are being replaced by their rewrites, hist2-* (before_after.py rewrite, 2026-10-29); never serve them
     todo = [r for r in POOL if r["id"] not in done and r["id"] not in removed and r["id"] not in skipped
@@ -173,26 +190,33 @@ def show(item: dict | None, progress: str):
     terms = f" · keep: {', '.join(item['protect_terms'])}" if item.get("protect_terms") else ""
     began = {"adapted": f"learned draft ({item.get('adapt_round')})", "s1": "S1-mini", "draft": "Haiku draft"}[start_kind(item)]
     meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms} · edit starts from {began}"
+    if item.get("added_words") and not item.get("revisit"):
+        meta += f" · ⚠ draft adds words not in the original: **{', '.join(item['added_words'])}**"
     original = card("Original · click a sentence to copy it, shift-click another to copy the run between", copyable(item["input"]), "original", item["input"])
     s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>", "s1", item.get("s1"))
     return item["id"], original, s1, start(item), meta, progress
 
 
-def on_load(skipped):
-    return show(*pick_next(skipped or []))
+def on_load(skipped, revisit=False):
+    return show(*pick_next(skipped or [], revisit))
 
 
-def on_skip(item_id, skipped):
+def on_skip(item_id, skipped, revisit):
     skipped = (skipped or []) + ([item_id] if item_id else [])
-    return (*show(*pick_next(skipped)), skipped)
+    return (*show(*pick_next(skipped, revisit)), skipped)
 
 
-def save(item_id, output, skipped, force, profile, oauth_token, no_change=False):
+def on_revisit(revisit):
+    return (*show(*pick_next([], revisit)), [])
+
+
+def save(item_id, output, skipped, force, profile, oauth_token, no_change=False, revisit=False):
     if profile is None or oauth_token is None:
         raise gr.Error("Sign in with Hugging Face first.")
     if not item_id:
         raise gr.Error("No item loaded.")
-    item = BY_ID[item_id]
+    prev = SAVED.get(item_id) if revisit else None
+    item = {**BY_ID.get(item_id, {}), **prev} if prev else BY_ID[item_id]
     output = item["input"] if no_change else output.strip()
     # Case- and punctuation-insensitive, and a warning only: the first version blocked saves on false
     # alarms (Daniel, 2026-10-29), e.g. a term that changed case or picked up a hyphen.
@@ -211,13 +235,20 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
         "protect_terms": item.get("protect_terms") or [], "words_in": item["words_in"],
         "annotator": profile.username, "annotated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    if prev:  # a revisit keeps the history of the pair
+        record.update(start=prev.get("start"), adapted=prev.get("adapted"), adapt_round=prev.get("adapt_round"),
+                      edited_vs_start=output != prev["output"], revised_from=prev["output"], first_annotated_at=prev.get("first_annotated_at", prev["annotated_at"]))
+        record.update({k: v for k, v in prev.items() if k not in record})
     DONE.add(item_id)
+    SAVED[item_id] = record
+    if revisit:
+        skipped = (skipped or []) + [item_id]
     commit(oauth_token.token, f"annotations/{item_id}.jsonl", (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"),
-           f"Annotate {item_id}" + (" (no change)" if record["no_change"] else ""))
-    return (*show(*pick_next(skipped or [])), skipped, False)
+           ("Revise " if prev else "Annotate ") + item_id + (" (no change)" if record["no_change"] else ""))
+    return (*show(*pick_next(skipped or [], revisit)), skipped, False)
 
 
-def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
+def on_remove(item_id, skipped, revisit, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
     if profile is None or oauth_token is None:
         raise gr.Error("Sign in with Hugging Face first.")
     if not item_id:
@@ -227,15 +258,15 @@ def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr
     REMOVED.add(item_id)
     commit(oauth_token.token, f"removed/{item_id}.json", json.dumps(record).encode("utf-8"), f"Remove {item_id} (invalid)")
     gr.Info(f"Removed {item_id}.")
-    return (*show(*pick_next(skipped or [])), skipped)
+    return (*show(*pick_next(skipped or [], revisit)), skipped)
 
 
-def on_save(item_id, output, skipped, force, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
-    return save(item_id, output, skipped, force, profile, oauth_token)
+def on_save(item_id, output, skipped, force, revisit, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
+    return save(item_id, output, skipped, force, profile, oauth_token, revisit=revisit)
 
 
-def on_no_change(item_id, output, skipped, force, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
-    return save(item_id, output, skipped, force, profile, oauth_token, no_change=True)
+def on_no_change(item_id, output, skipped, force, revisit, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
+    return save(item_id, output, skipped, force, profile, oauth_token, no_change=True, revisit=revisit)
 
 
 CSS = """
@@ -273,7 +304,9 @@ with gr.Blocks(title="ASR Clean-up Annotator", css=CSS, head=COPY_JS) as demo:
         "**Remove (invalid)** drops the item. Click a sentence of the original to copy it (shift-click a second one for the run between). "
         f"Saves go to [`{DATASET}`](https://huggingface.co/datasets/{DATASET})."
     )
-    gr.LoginButton()
+    with gr.Row():
+        gr.LoginButton()
+        revisit = gr.Checkbox(label="Revisit saved pairs (re-edit what was trained on; starts from your saved edit)", value=False)
     item_id, skipped = gr.State(None), gr.State([])
     with gr.Row():
         meta, progress = gr.Markdown(), gr.Markdown()
@@ -296,13 +329,15 @@ with gr.Blocks(title="ASR Clean-up Annotator", css=CSS, head=COPY_JS) as demo:
 
     outs = [item_id, original, s1, after, meta, progress]
     demo.load(on_load, [skipped], outs)
-    save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force])
-    same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force])
-    remove_btn.click(on_remove, [item_id, skipped], outs + [skipped])
-    skip_btn.click(on_skip, [item_id, skipped], outs + [skipped])
-    reset_btn.click(lambda i: (BY_ID[i].get("s1") or BY_ID[i]["draft"]) if i else "", [item_id], [after])
-    haiku_btn.click(lambda i: BY_ID[i]["draft"] if i else "", [item_id], [after])
-    learned_btn.click(lambda i: start(BY_ID[i]) if i else "", [item_id], [after])
+    revisit.change(on_revisit, [revisit], outs + [skipped])
+    save_btn.click(on_save, [item_id, after, skipped, force, revisit], outs + [skipped, force])
+    same_btn.click(on_no_change, [item_id, after, skipped, force, revisit], outs + [skipped, force])
+    remove_btn.click(on_remove, [item_id, skipped, revisit], outs + [skipped])
+    skip_btn.click(on_skip, [item_id, skipped, revisit], outs + [skipped])
+    rec = lambda i: BY_ID.get(i) or SAVED[i]  # a revisited pair can be gone from the pool (hist-*)
+    reset_btn.click(lambda i: (rec(i).get("s1") or rec(i)["draft"]) if i else "", [item_id], [after])
+    haiku_btn.click(lambda i: rec(i)["draft"] if i else "", [item_id], [after])
+    learned_btn.click(lambda i: start(rec(i)) if i else "", [item_id], [after])
 
 if __name__ == "__main__":
     demo.launch()
