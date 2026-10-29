@@ -1,0 +1,21 @@
+{
+  "tag": "lists",
+  "created": "2026-10-29",
+  "why": "Daniel breaks dictated points out as bullets in the middle of prose (fill2-note-193 action items: lead-in line ending in a colon, '- ' bullets, prose resumes after).",
+  "n": 14,
+  "seed": 31,
+  "kinds": [
+    "email"
+  ],
+  "words": [
+    90,
+    220
+  ],
+  "behaviour": "partway through, after some normal prose, the speaker announces a set of three to five points and dictates them in a run (\"so there are a few things I need from you, first the signed contract, second...\", \"my main points are, one... two...\", \"a couple of things, the deck, and also the budget sheet, and then...\"), each point a short phrase or a sentence, then goes back to normal prose and signs off",
+  "rule": "Break a run of three or more dictated points out as a bulleted list in the middle of the text: the lead-in on its own line ending in a colon (\"A few things I need from you:\"), then one '- ' bullet per point, capitalised, without the spoken ordinals or joiners (first, second, number one, and also, and then), keeping every detail of each point; resume the prose as a new paragraph after the list. Keep the prose before and after as paragraphs. Two short items inside one sentence stay in the sentence.",
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    1
+  ]
+}
