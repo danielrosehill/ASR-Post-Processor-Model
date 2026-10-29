@@ -9,7 +9,14 @@ but with fillers, false starts, *gonna*, no paragraph breaks, the odd repeated p
 a sentence said to someone at the door. The output is the same text with those fixed and nothing else
 changed. Restyling, restructuring and reformatting are a separate, later step.
 
-**Status (2026-10-16): planning.** No data, no model yet. The chosen approach is a LoRA fine-tune of
+**Status (2026-10-29): annotating.** 535 before/after items (Daniel's own dictations, obfuscated; code-switching and
+tech sentences; Haiku-written emails, calendar entries and messages), each with stock S1-mini's output and a
+Haiku draft under his foundation cleanup prompt, are in the public dataset
+[`danielrosehill/ASR-Cleanup-Before-After`](https://huggingface.co/datasets/danielrosehill/ASR-Cleanup-Before-After),
+edited in the private Space `danielrosehill/ASR-Cleanup-Annotator` (`space/`); target about 300 edits
+([decision 0003](docs/decisions/0003-before-after-pool-foundation-scope.md)).
+
+**Earlier (2026-10-16): planning.** No data, no model yet. The chosen approach is a LoRA fine-tune of
 [S1-mini by Superwhisper](https://huggingface.co/superwhisper/s1-mini); the training data is about 100 triples of raw dictation, S1-mini's output and a hand edit, made in a local editor
 ([decision 0002](docs/decisions/0002-triples-training-data.md)).
 Start with the [development plan](docs/development-plan.md), then [fine-tuning](docs/fine-tuning.md).
@@ -47,6 +54,9 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 | [`scripts/pairs.py`](scripts/pairs.py) | Validate training-pair JSONL; rebuild the smoke-test set |
 | [`data/smoke/`](data/smoke/) | 17 pairs from the taxonomy examples, for smoke tests only |
 | [`docs/decisions/`](docs/decisions/) | Decision records (base model, training-data approach) |
+| [`scripts/before_after.py`](scripts/before_after.py) | Builds the before/after pool (history, vocab, Haiku drafts via Message Batches) and uploads it |
+| [`scripts/s1_modal.py`](scripts/s1_modal.py) | Stock S1-mini on every pool item on a Modal GPU (`MODAL_PROFILE=danielrosehill modal run scripts/s1_modal.py`) |
+| [`space/`](space/) | The private annotation Space (original, S1-mini, your edit), deployed to HF as-is |
 | [`tools/editor/`](tools/editor/) | Local GUI for making triples: raw, stock S1-mini output, your edit (`uv run tools/editor/server.py`) |
 | [`scripts/build_queue.py`](scripts/build_queue.py) | Builds the editor's queue of real raw dictation from public HF datasets |
 | [`data/triples/`](data/triples/) | Editor queue, cached S1-mini outputs, and the saved triples |

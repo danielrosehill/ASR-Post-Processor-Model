@@ -3,9 +3,9 @@
   "name": "asr-post-processor-model",
   "title": "Light-touch text-in/text-out cleanup of raw Parakeet v2 dictation",
   "created": "2026-10-16",
-  "updated": "2026-10-16",
-  "status": "planning",
-  "stage": "spec",
+  "updated": "2026-10-29",
+  "status": "annotating",
+  "stage": "data",
   "verdict": null,
   "task": {
     "pipeline_tag": "text-generation",

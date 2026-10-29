@@ -166,6 +166,7 @@ Each decision has its own record in [`decisions/`](decisions/).
 |---|---|---|
 | [0001](decisions/0001-fine-tune-s1-mini.md) | 2026-10-16 | Fine-tune S1-mini (LoRA) rather than a general small base; Qwen3-0.6B as control |
 | [0002](decisions/0002-triples-training-data.md) | 2026-10-16 | POC training data is about 100 hand-edited triples (raw → S1-mini → speaker); synthetic becomes optional |
+| [0003](decisions/0003-before-after-pool-foundation-scope.md) | 2026-10-29 | ~300 before/after edits from Daniel's own history plus vocab sentences, drafted by Haiku under his foundation cleanup prompt; S1-mini is the baseline |
 
 ## Open questions
 
