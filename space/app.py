@@ -117,6 +117,8 @@ COPY_JS = """
     els.forEach(el => { el.classList.add('copied'); setTimeout(() => el.classList.remove('copied'), 700); });
   };
   document.addEventListener('click', e => {
+    const all_ = e.target.closest('.card .copyall');
+    if (all_) { copy(all_.parentElement.querySelector('.fulltext').textContent, [all_]); return; }
     const mark = e.target.closest('.copyable .pmark');
     if (mark) { const s = [...mark.parentElement.querySelectorAll('.sent')]; copy(s.map(x => x.textContent).join(' '), s); return; }
     const el = e.target.closest('.copyable .sent');
@@ -138,7 +140,9 @@ COPY_JS = """
 
 def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
     done, removed = done_ids()
-    todo = [r for r in POOL if r["id"] not in done and r["id"] not in removed and r["id"] not in skipped]
+    # hist-* are being replaced by their rewrites, hist2-* (before_after.py rewrite, 2026-10-29); never serve them
+    todo = [r for r in POOL if r["id"] not in done and r["id"] not in removed and r["id"] not in skipped
+            and not r["id"].startswith("hist-")]
     counts: dict[str, int] = {}
     for i in done:
         if i in BY_ID:
@@ -147,6 +151,8 @@ def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
                 + " · ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     if not todo:
         return None, progress
+    # Review queue first (2026-10-29): hist2-* are synthetic pairs (`pairs`) and carried edits to check before training
+    todo = [r for r in todo if r["id"].startswith("hist2-")] or todo
     least = min(counts.get(r["use_case"], 0) for r in todo)
     return random.choice([r for r in todo if counts.get(r["use_case"], 0) == least]), progress
 
@@ -167,8 +173,8 @@ def show(item: dict | None, progress: str):
     terms = f" · keep: {', '.join(item['protect_terms'])}" if item.get("protect_terms") else ""
     began = {"adapted": f"learned draft ({item.get('adapt_round')})", "s1": "S1-mini", "draft": "Haiku draft"}[start_kind(item)]
     meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms} · edit starts from {began}"
-    original = card("Original · click a sentence to copy it, shift-click another to copy the run between", copyable(item["input"]), "original")
-    s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>", "s1")
+    original = card("Original · click a sentence to copy it, shift-click another to copy the run between", copyable(item["input"]), "original", item["input"])
+    s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>", "s1", item.get("s1"))
     return item["id"], original, s1, start(item), meta, progress
 
 
@@ -245,11 +251,18 @@ CSS = """
 .copyable .sent.copied { background: #b7e4c7; }
 .copyable .pmark { cursor: copy; color: #b42318; opacity: .45; font-weight: 600; margin-right: 2px; }
 .copyable .pmark:hover { opacity: 1; }
+.card .copyall { float: right; cursor: copy; text-transform: none; letter-spacing: 0; font-weight: 500; padding: 1px 8px; border: 1px solid #d0d5dd; border-radius: 6px; background: #fff; }
+.card .copyall:hover { background: #f2f4f7; }
+.card .copyall.copied { background: #b7e4c7; }
 """
 
 
-def card(label: str, body: str, kind: str = "") -> str:
-    return f'<div class="card {kind}"><div class="label">{label}</div>{body}</div>'
+def card(label: str, body: str, kind: str = "", full: str | None = None) -> str:
+    """`full`: the card's whole text, behind a copy icon (Daniel, 2026-10-29: paste S1-mini or the original over
+    the learned draft and start from there). Kept in a hidden <pre> so paragraph breaks survive the copy."""
+    btn = (f'<span class="copyall" title="Copy all">⧉ copy</span><pre class="fulltext" hidden>{html.escape(full)}</pre>'
+           if full else "")
+    return f'<div class="card {kind}"><div class="label">{label}{btn}</div>{body}</div>'
 
 
 with gr.Blocks(title="ASR Clean-up Annotator", css=CSS, head=COPY_JS) as demo:

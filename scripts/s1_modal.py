@@ -1,6 +1,6 @@
 """Stock S1-mini by Superwhisper on every before/after pool item, on Modal (GPU), for the annotator's middle column.
 
-  MODAL_PROFILE=danielrosehill modal run scripts/s1_modal.py   # reads data/private/{history,vocab,fill}.jsonl and every synth round (data/synth/<tag>.json), writes data/private/s1.jsonl
+  MODAL_PROFILE=danielrosehill modal run scripts/s1_modal.py   # reads data/private/{history2 (else history),vocab,fill}.jsonl and every synth round (data/synth/<tag>.json), writes data/private/s1.jsonl
 
 Prompt: training/s1mini_lora.py `render_prompt(text, None)`, i.e. stock S1-mini's pinned control line
 (`[Styling: semi-formal] [Structure: prose] [Context: general]`, no Layers axis), greedy decoding,
@@ -53,7 +53,8 @@ def generate(texts: list[str]) -> list[str]:
 
 @app.local_entrypoint()
 def main():
-    items = [json.loads(l) for f in ["history.jsonl", "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted((ROOT / "data" / "synth").glob("*.json"))] if (PRIVATE / f).exists()
+    hist = "history2.jsonl" if (PRIVATE / "history2.jsonl").exists() else "history.jsonl"  # before_after.py rewrite
+    items = [json.loads(l) for f in [hist, "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted((ROOT / "data" / "synth").glob("*.json"))] if (PRIVATE / f).exists()
              for l in (PRIVATE / f).read_text(encoding="utf-8").splitlines()]
     path = PRIVATE / "s1.jsonl"
     have = {json.loads(l)["id"] for l in path.read_text().splitlines()} if path.exists() else set()
