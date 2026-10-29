@@ -1,0 +1,34 @@
+{
+  "tag": "spelled",
+  "created": "2026-10-29",
+  "why": "Daniel drops spelled-out clarifications and uses the spelling (\"it's spelled D-A-V-E-N\" -> \"Daven\"); only a handful in his edits.",
+  "n": 20,
+  "seed": 12,
+  "kinds": [
+    "ai_prompt",
+    "email",
+    "message",
+    "note",
+    "calendar"
+  ],
+  "words": [
+    20,
+    140
+  ],
+  "behaviour": "the speaker spells out one or two names or unusual words letter by letter for the transcriber (\"that's Daven, D-A-V-E-N\", \"it's spelled K-O-B-I\", \"Shira with an S-H\"), sometimes after the recogniser has written the word wrongly",
+  "rule": "When the speaker spells a word out, write the word with that spelling (capitalised if it is a name) wherever it appears, and drop the spelling and the \"it's spelled\" phrase entirely.",
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "seeds": {
+    "files": [
+      "spelled-out"
+    ],
+    "k": [
+      1,
+      1
+    ]
+  }
+}

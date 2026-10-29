@@ -1,0 +1,34 @@
+{
+  "tag": "pausebreaks",
+  "created": "2026-10-29",
+  "words": [
+    20,
+    140
+  ],
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "why": "L1.pause-induced-sentence-breaks: Parakeet ends a sentence at a mid-clause pause, leaving a fragment and a spurious capital.",
+  "n": 20,
+  "seed": 23,
+  "kinds": [
+    "email",
+    "note",
+    "ai_prompt",
+    "message"
+  ],
+  "behaviour": "the speech recogniser has broken two or three sentences at a mid-clause pause, leaving a full stop and a spurious capital inside one sentence (\"One failure pattern. Is that I start a sentence, stop, and continue it.\", \"I'll send it over. Once the client signs.\")",
+  "rule": "Rejoin a sentence the recogniser broke at a pause: remove the false full stop and lower-case the next word (\"One failure pattern is that I start a sentence...\"). Leave genuine short sentences alone.",
+  "seeds": {
+    "files": [
+      "pauses",
+      "fragments"
+    ],
+    "k": [
+      1,
+      2
+    ]
+  }
+}

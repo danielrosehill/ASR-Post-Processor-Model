@@ -9,6 +9,8 @@
   with-secrets uv run scripts/before_after.py vocab [--n 100]
   with-secrets uv run scripts/before_after.py fill
   with-secrets uv run scripts/before_after.py synth <tag>     # spec data/synth/<tag>.json, e.g. fill2
+  with-secrets uv run scripts/before_after.py target <tag>     # spec data/targets/<tag>.json, e.g. gonna; then pool --upload
+  with-secrets uv run scripts/before_after.py capitals [--n 150] # mid-sentence capital pairs, one edit each; trained directly
   with-secrets uv run scripts/before_after.py pairs [--n 70]   # synthetic pairs for review, then pool --upload
   with-secrets uv run scripts/before_after.py adapt [--words 12000] [--upload]   # after every ~25 new annotations
   uv run scripts/before_after.py edits [--last N]            # Daniel's saved edits vs S1-mini, compact
@@ -76,8 +78,11 @@ import anthropic
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "data" / "private"
+TARGETS = ROOT / "data" / "targets"  # targeted pair specs (`target`): one behaviour each, input and output written
 SYNTH = ROOT / "data" / "synth"  # synthetic round specs (public; the outputs stay in data/private)
 MODEL = "claude-haiku-5-5"
+TASK_PROMPTS = Path(os.environ.get("TASK_PROMPTS", Path.home() / "repos/github/ai-models/Voice-Training-Recorder/data/task-prompts"))  # ASR fine-tune task rows
+TARGET_MODEL = "~google/gemini-flash-latest"  # OpenRouter alias; each row records the model it resolved to (Daniel: cheaper than Sonnet)
 REWRITE_MODEL = "claude-sonnet-5-5"  # Haiku paraphrased instead of changing the subject (rewrite v1-v3, 2026-10-29)
 DATASET = "danielrosehill/ASR-Cleanup-Before-After"  # public; the Space is private
 SPACE = "danielrosehill/ASR-Cleanup-Annotator"
@@ -168,6 +173,30 @@ def batch(c: anthropic.Anthropic, jobs: list[tuple[str, str, str]], tag: str, mo
     return out
 
 
+def openrouter(system: str, user: str, max_tokens: int = 8000) -> tuple[str, str]:
+    """One OpenRouter chat completion (OPENROUTER_API_KEY via with-secrets): (text, the model that answered).
+    Gemini Flash's reasoning tokens count against max_tokens (a 1,500 cap cut dictations off mid-sentence,
+    2026-10-29), so reasoning is set low, the cap is high, and a reply that hit the cap comes back empty."""
+    key = os.environ.get("OPENROUTER_API_KEY") or sys.exit("OPENROUTER_API_KEY is not set: run under `with-secrets`.")
+    body = json.dumps({"model": TARGET_MODEL, "max_tokens": max_tokens, "temperature": 0.7, "reasoning": {"effort": "low"},
+                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
+    for attempt in range(4):
+        try:
+            req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=body,
+                                         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=180) as r:
+                d = json.loads(r.read())
+            ch = d["choices"][0]
+            if ch.get("finish_reason") == "length":
+                return "", d.get("model", TARGET_MODEL)
+            return (ch["message"]["content"] or "").strip(), d.get("model", TARGET_MODEL)
+        except (urllib.error.URLError, KeyError, TimeoutError) as e:
+            if attempt == 3:
+                print(f"openrouter failed: {e}")
+                return "", TARGET_MODEL
+            time.sleep(5 * (attempt + 1))
+
+
 def write(name: str, rows: list[dict]) -> None:
     PRIVATE.mkdir(parents=True, exist_ok=True)
     (PRIVATE / name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
@@ -250,6 +279,7 @@ def sources() -> list[dict]:
     """Every pool item: history, vocab and the synthetic rounds (fill.jsonl, then data/synth/<tag>.json order)."""
     hist = "history2.jsonl" if (PRIVATE / "history2.jsonl").exists() else "history.jsonl"  # `rewrite`
     return [r for f in [hist, "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted(SYNTH.glob("*.json"))]
+            + [f"target-{p.stem}.jsonl" for p in sorted(TARGETS.glob("*.json"))]
             for r in read(f)]
 
 
@@ -377,6 +407,127 @@ def pairs(n: int) -> None:
     write("adapted.jsonl", read("adapted.jsonl") + rows)
 
 
+TARGET_INPUT = FILL_PROMPT.replace(" (arnona, kupat holim, makolet, teudat zehut, misrad, yalla, beseder)", "").replace("Write {kind_desc}, about {scene}, {lo} to {hi} words. {mess}",
+                                   "Write {kind_desc}, about {scene}, {lo} to {hi} words, in which {behaviour}. {mess} "
+                                   "Most of his dictations have no Hebrew word at all; use one only in about one in four, and only if it fits the subject.")
+
+
+def target(path: Path) -> None:
+    """Targeted pairs: one behaviour baked in on purpose (Daniel, 2026-10-29: "a skill for generating synthetic
+    pairs to bake something in, now that my basic editing formula is applied"). Spec data/targets/<tag>.json:
+    behaviour (what the speaker does), rule (what the clean-up does), n, kinds, words, features_from (a synth spec
+    whose artifacts are mixed in, features_per_item of them). TARGET_MODEL writes each raw dictation, then cleans it
+    few-shot on Daniel's edits plus the rule (then `tidy`), both via OpenRouter (TARGET_MODEL). Each item gets a random
+    topic from REWRITE_TOPICS (the pilot without one put arnona and the misrad in every item). -> data/private/target-<tag>.jsonl, ids tgt-<tag>-NNN,
+    output in `target_output`; `pool` starts the Space from it and serves these first (`review`), so each is
+    checked and saved before training. Direct parallel calls (minutes).
+    Optional `seeds`: {"files": [...], "k": [lo, hi]} draws rows from the ASR fine-tune's task prompts (TASK_PROMPTS,
+    rows {spoken, target}; Daniel, 2026-10-29: "we already have the corrected pairs there, reverse them back to the
+    raw originals"): the writer works each spoken sentence in, and the cleaner is told its written target."""
+    from concurrent.futures import ThreadPoolExecutor
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    tag, rng = spec["tag"], random.Random(spec["seed"])
+    feats = json.loads((SYNTH / f"{spec['features_from']}.json").read_text())["features"] if spec.get("features_from") else []
+    feats = [f for f in feats if not COMMAND.search(f)]
+    lo, hi = spec["words"]
+    seeds = spec.get("seeds")
+    rows_in = [r for f in seeds["files"] for r in json.loads((TASK_PROMPTS / f"{f}.json").read_text(encoding="utf-8"))
+               if r.get("spoken") and r.get("target") and r["spoken"] != r["target"]] if seeds else []
+    jobs = []
+    for i in range(spec["n"]):
+        kind = spec["kinds"][i % len(spec["kinds"])]
+        f = rng.sample(feats, rng.randint(*spec["features_per_item"])) if feats else []
+        mess = ("Also include: " + "; ".join(f) + ".") if f else ""
+        sd = rng.sample(rows_in, rng.randint(*seeds["k"])) if rows_in else []
+        if sd:
+            mess += (" Work these sentences in, close to word for word, as he would say them (numbers and amounts in words "
+                     "where they are given in words): " + " / ".join(f'"{r["spoken"]}"' for r in sd))
+        jobs.append((f"tgt-{tag}-{i:03d}", kind, sd, TARGET_INPUT.format(kind_desc=KIND_DESC.get(kind, f"a dictated {kind.replace('_', ' ')}"),
+                                                                       scene=rng.choice(REWRITE_TOPICS), lo=lo, hi=hi,
+                                                                       behaviour=spec["behaviour"], mess=mess)))
+    recs = [r for r in annotations() if not r["id"].startswith("hist-")]
+    block, _ = shots(recs, 12000)
+    system = (ADAPT.split("\n\nYour output is the starting draft")[0]
+              + f"\n\nOne more rule, which the examples may not show: {spec['rule']}\n\n" + block)
+    def one(job):
+        cid, kind, sd, prompt = job
+        raw, m1 = openrouter("You write realistic raw dictation transcripts. Output only the dictation.", prompt)
+        raw = re.sub(r"\s+", " ", raw).strip()
+        hint = ("\n\nThis dictation works in sentences whose correct written form is known; write them this way "
+                "(adjusted only to fit the text around them): " + " / ".join(f'"{r["target"]}"' for r in sd)) if sd else ""
+        out, m2 = openrouter(system + hint, wrap(raw)) if raw else ("", "")
+        return {"id": cid, "source": "synthetic-target", "use_case": kind, "target": tag, "input": raw, "protect_terms": [],
+                "words_in": len(raw.split()), "target_output": tidy(re.sub(r"[ \t]+\n", "\n", out)), "target_models": [m1, m2],
+                "seed_rows": [{"spoken": r["spoken"], "target": r["target"]} for r in sd]}
+    with ThreadPoolExecutor(8) as ex:
+        rows = [r for r in ex.map(one, jobs) if r["input"] and r["target_output"]]
+    write(f"target-{tag}.jsonl", rows)
+
+
+CAP_WORDS = ("the a an and but or so is are was were be to of for with in on at from that this these those it we you they "
+             "he she my our your their just then which what when where if because not can could will would should have has "
+             "do does did use get make take send check look need want going all some any more one there here").split()
+OPEN = set("the a an to of for with in on at from that and or but is are was my our your their this could would will can should".split())
+CAP_STOP = re.compile(r"\b([a-z']+)\. (" + "|".join(w.capitalize() for w in CAP_WORDS) + r")\b")
+CAP_MID = re.compile(r"\b([a-z']+) (" + "|".join(w.capitalize() for w in CAP_WORDS) + r") [a-z]")
+CAP_WRITE = """Write one sentence of everyday dictation by Daniel (English speaker in Israel, works in tech), about {topic}, {lo} to {hi} words, written correctly and naturally. {neg}Output only the sentence."""
+
+
+def capitals(n: int, db: Path) -> None:
+    """Mid-sentence capitals (Daniel, 2026-10-29: "a very common one... a capital letter in the middle of a sentence
+    that shouldn't have been there, and the sole edit is moving that to lowercase"; short isolated examples, one
+    transformation each). Parakeet capitalises the word after a pause, with or without a stray full stop:
+    "we could Use those", "connects to the. We can". history.db (2,535 dictations, 2026-10-29) gives the share with
+    a stray stop; none of its text is used. TARGET_MODEL writes a natural clean sentence on a random topic and the
+    error is injected here at a mid-sentence word in CAP_WORDS (a stop only after a word in OPEN, which cannot end
+    a sentence), so input and output differ by that capital (and stop) alone; checked. A fourth are no-change
+    sentences with a real mid-sentence capital (a name, "I", a product). (Forcing the history's exact word pair
+    into the sentence read stilted: "their They pronouns", pilot 2026-10-29.) -> data/private/capitals.jsonl,
+    ids cap-NNN; modal_poc.py `data` trains on them directly (deterministic, no Space review)."""
+    from concurrent.futures import ThreadPoolExecutor
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    texts = [t for (t,) in con.execute("SELECT text FROM dictations WHERE source = 'dictate'")]
+    stops = sum(1 for t in texts for m in CAP_STOP.finditer(t) if m.group(1) in OPEN)
+    mids = sum(1 for t in texts for _ in CAP_MID.finditer(t))
+    p_stop = stops / (stops + mids)
+    rng = random.Random(7)
+    neg = round(n / 4)
+    jobs = [(f"cap-{i:03d}", i < neg, rng.random() < p_stop, rng.choice([(6, 14), (10, 22), (15, 30)]),
+             rng.choice(REWRITE_TOPICS), random.Random(i)) for i in range(n)]
+    def one(job):
+        cid, negative, stop, (lo, hi), topic, r = job
+        clean, m = openrouter("You write single sentences. Output only the sentence.", CAP_WRITE.format(
+            topic=topic, lo=lo, hi=hi,
+            neg="It must contain a word that is correctly capitalised mid-sentence: a person's name, a place, a product such as WhatsApp or GitHub, or \"I\". " if negative else ""))
+        clean = re.sub(r"\s+", " ", clean).strip().strip('"')
+        if not clean or len(clean.split()) > 40 or not clean[-1] in ".?!":
+            return None
+        w = clean.split(" ")
+        spots = [k for k in range(2, len(w) - 1) if w[k] in CAP_WORDS and re.fullmatch(r"[a-z']+", w[k - 1])
+                 and (not stop or w[k - 1] in OPEN)]
+        if not negative and not spots:
+            return None
+        if negative:
+            raw = clean
+        else:
+            k = r.choice(spots)
+            w2 = w[:]
+            w2[k] = w[k].capitalize()
+            if stop:
+                w2[k - 1] += "."
+            raw = " ".join(w2)
+        squash = lambda s: re.sub(r"[^\w\s]", "", s.lower())
+        if squash(raw) != squash(clean) or (raw == clean) != negative:
+            return None
+        return {"id": cid, "source": "synthetic-capitals", "use_case": "message", "input": raw, "carried_output": clean,
+                "capital_shape": {"stop": stop and not negative, "negative": negative}, "model": m}
+    with ThreadPoolExecutor(8) as ex:
+        rows = [r for r in ex.map(one, jobs) if r]
+    write("capitals.jsonl", rows)
+    print(f"{len(rows)}/{n} rows ({sum(r['capital_shape']['negative'] for r in rows)} no-change, "
+          f"{sum(r['capital_shape']['stop'] for r in rows)} with a stray stop; history stop share {p_stop:.0%}) -> data/private/capitals.jsonl")
+
+
 def adapt(max_words: int, upload: bool) -> None:
     """Re-draft every pool item not yet annotated or removed, few-shot on Daniel's saved edits, so the
     annotator's edit box starts closer to what he wants (Daniel, 2026-10-29: "improve as we go along").
@@ -399,7 +550,8 @@ def adapt(max_words: int, upload: bool) -> None:
     shots = "\n\n".join(f"<example>\n<input>\n{r['input']}\n</input>\n<output>\n{r['output']}\n</output>\n</example>"
                          for r in picked)
     system = [{"type": "text", "text": ADAPT + shots, "cache_control": {"type": "ephemeral"}}]
-    todo = [it for it in sources() if it["id"] not in done and not COMMAND.search(it["input"]) and "carried_output" not in it]
+    todo = [it for it in sources() if it["id"] not in done and not COMMAND.search(it["input"])
+            and "carried_output" not in it and "target_output" not in it]
     for kind in ("s1", "adapted"):  # is the learned draft cutting his work? saves accepted as they started
         k = [r for r in recs if r.get("start", "s1") == kind]
         if k:
@@ -629,6 +781,8 @@ def pool(upload: bool) -> None:
     rows = []
     for it in sources():
         d = drafts.get(it["id"])
+        if d is None and "target_output" in it:  # `target` items have no Haiku draft; the cleaned output stands in
+            d = {"draft": it["target_output"], "draft_model": it["target_models"][1]}
         if d is None or it["id"] in removed or COMMAND.search(it["input"]):
             continue
         if it["id"].startswith("hist2-") and "carried_output" not in it and it["id"] not in adapted:  # `pairs` only
@@ -636,6 +790,9 @@ def pool(upload: bool) -> None:
         a = {k: tidy(v) if k == "adapted" else v for k, v in adapted.get(it["id"], {}).items() if k != "id"}
         if "carried_output" in it:  # `rewrite`: his edit of the old item, transposed; the Space starts from it
             a = {"adapted": it["carried_output"], "adapt_model": MODEL, "adapt_round": f"carried from {it['carried_from']}"}
+        if "target_output" in it:  # `target`: written to the spec's rule
+            a = {"adapted": it["target_output"], "adapt_model": it["target_models"][1], "adapt_round": f"target {it['target']}"}
+        a["review"] = it["id"].startswith(("hist2-", "tgt-"))  # the Space serves these first
         rows.append({**it, "control": CONTROL, "draft": tidy(d["draft"]), "draft_model": d["draft_model"],
                      "draft_unchanged": d["draft"] == it["input"],
                      "s1": s1.get(it["id"], {}).get("s1"), "s1_model": s1.get(it["id"], {}).get("s1_model"),
@@ -666,6 +823,10 @@ if __name__ == "__main__":
         fill()
     elif cmd == "synth":
         synth(SYNTH / f"{sys.argv[2]}.json")
+    elif cmd == "target":
+        target(TARGETS / f"{sys.argv[2]}.json")
+    elif cmd == "capitals":
+        capitals(int(args.get("--n", 150)), Path(os.path.expanduser(args.get("--db", "~/.local/share/hebrish/history.db"))))
     elif cmd == "pairs":
         pairs(int(args.get("--n", 70)))
     elif cmd == "adapt":

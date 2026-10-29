@@ -1,0 +1,34 @@
+{
+  "tag": "dates",
+  "created": "2026-10-29",
+  "why": "Dates and percentages as digits (tidy): \"the 12th of March\" -> \"March 12\", \"by the fifteenth\" -> \"by the 15th\", \"eleven percent\" -> \"11%\".",
+  "n": 12,
+  "seed": 14,
+  "kinds": [
+    "ai_prompt",
+    "email",
+    "message",
+    "note",
+    "calendar"
+  ],
+  "words": [
+    20,
+    140
+  ],
+  "behaviour": "the speaker says two or three dates, days of the month or percentages in words (\"the twelfth of March\", \"March the nineteenth\", \"by the fifteenth\", \"September nineteen\", \"eleven percent\")",
+  "rule": "Write dates with a month name as \"March 12\" (\"Thursday, March 12\" with a weekday), a bare day of the month as \"the 15th\", and percentages as \"11%\".",
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "seeds": {
+    "files": [
+      "dates-times"
+    ],
+    "k": [
+      1,
+      2
+    ]
+  }
+}

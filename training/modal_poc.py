@@ -8,7 +8,9 @@
 data   Pairs from the saved annotations (scripts/before_after.py `annotations`): items with a spoken edit command
        (COMMAND) and the old hist-* items (replaced by their rewrites, `rewrite`) are left out; the 21 hist2-* items
        reviewed in the Space are annotations like any other; a carried edit (`carried_output`) not yet reviewed goes in as is. A fixed 9 of the real edits,
-       one or two per use case, are held out as test. -> data/private/poc/{train,test}.jsonl, control [Layers: 1,2].
+       one or two per use case, are held out as test. The targeted pairs
+       (before_after.py `target`, target-*.jsonl, and `capitals`) go in as generated unless already saved in the Space;
+       two of each are held out as behaviour probes in the test set (`source` = target-<tag> / capitals). -> data/private/poc/{train,test}.jsonl, control [Layers: 1,2].
 run    training/s1mini_lora.py `train` on an L4/A10G (rank 16, 4 epochs, batch 4, lr 2e-4), then `infer` on the
        test set twice: stock S1-mini (its own control line) and base + adapter. -> data/private/poc/{base,lora}.jsonl
        and the adapter in data/private/poc/adapter/ (not pushed: the data includes obfuscated history).
@@ -43,10 +45,22 @@ def data() -> None:
     saved = {r["id"] for r in recs}  # reviewed hist2-* pairs are saved annotations; an unreviewed carried edit still counts
     train += [pair(h["id"], h["input"], h["carried_output"], "carried") for h in b.read("history2.jsonl")
               if "carried_output" in h and h["id"] not in saved]
+    probe = []  # 2 per behaviour held out: did it learn each one (Daniel, 2026-10-29: train once every objective has pairs)
+    for f in sorted(b.PRIVATE.glob("target-*.jsonl")) + [b.PRIVATE / "capitals.jsonl"]:
+        rows = [r for r in b.read(f.name) if r["id"] not in saved]
+        src = f.stem
+        k = set(r["id"] for r in random.Random(1).sample(rows, min(2, len(rows))))
+        for r in rows:
+            out = r.get("target_output") or r["carried_output"]
+            (probe if r["id"] in k else train).append(pair(r["id"], r["input"], out, src))
     POC.mkdir(parents=True, exist_ok=True)
-    for name, rows in (("train", train), ("test", [pair(r["id"], r["input"], r["output"], "annotation") for r in test])):
+    test = [pair(r["id"], r["input"], r["output"], "annotation") for r in test] + probe
+    for name, rows in (("train", train), ("test", test)):
         (POC / f"{name}.jsonl").write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows), encoding="utf-8")
-    print(f"train {len(train)} ({sum(x['source'] == 'carried' for x in train)} carried), test {len(test)} -> {POC}")
+    by: dict[str, int] = {}
+    for x in train:
+        by[x["source"]] = by.get(x["source"], 0) + 1
+    print(f"train {len(train)} {by}, test {len(test)} ({len(probe)} behaviour probes) -> {POC}")
 
 
 if __name__ == "__main__" and sys.argv[1:] == ["data"]:

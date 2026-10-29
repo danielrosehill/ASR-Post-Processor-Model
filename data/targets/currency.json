@@ -1,0 +1,34 @@
+{
+  "tag": "currency",
+  "created": "2026-10-29",
+  "words": [
+    20,
+    140
+  ],
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "why": "Daniel's own currency edits (8 annotations): shekel amounts as digits with NIS after, \"12,000 NIS\".",
+  "n": 24,
+  "seed": 21,
+  "kinds": [
+    "email",
+    "message",
+    "note",
+    "calendar",
+    "ai_prompt"
+  ],
+  "behaviour": "the speaker says one to three prices or amounts of money the way people say them aloud: shekels mostly (\"two thousand two hundred shekels\", \"forty-two thousand shekels\", \"about three hundred shekels\", \"one fifty\", \"twelve and a half thousand\"), sometimes dollars or euros (\"forty bucks\", \"a hundred and twenty dollars\"), occasionally \"NIS\" spoken as letters (\"N I S\")",
+  "rule": "Write money as digits with thousands commas and the currency after for shekels: \"2,200 NIS\", \"42,000 NIS\", \"about 300 NIS\" (shekels, shekel, NIS, N I S all become NIS; \"one fifty\" in a price context -> \"150 NIS\"; \"twelve and a half thousand\" -> \"12,500 NIS\"). Dollars and euros take the symbol before: \"$40\", \"$120\", \"€35\" (bucks -> dollars). Keep decimals as said (\"$4.50\"). Never change the amount itself. Large amounts keep the scale word: \"$2 million\", \"4.2 million NIS\". A currency named without an amount stays a word (\"some shekels\", \"the dollar\"). Same convention as the ASR fine-tune's currency task (ASR-Training docs/dataset.md).",
+  "seeds": {
+    "files": [
+      "currency"
+    ],
+    "k": [
+      1,
+      2
+    ]
+  }
+}

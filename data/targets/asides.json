@@ -1,0 +1,34 @@
+{
+  "tag": "asides",
+  "created": "2026-10-29",
+  "why": "Asides in parentheses (\"(the one for the Rehavia apartment)\").",
+  "n": 12,
+  "seed": 16,
+  "kinds": [
+    "ai_prompt",
+    "email",
+    "message",
+    "note",
+    "calendar"
+  ],
+  "words": [
+    20,
+    140
+  ],
+  "behaviour": "the speaker adds one or two short clarifying asides in passing (\"the bill, the one for the Rehavia apartment, came\", \"just to keep the session from timing out\")",
+  "rule": "Put a short clarifying aside in parentheses: \"the bill (the one for the Rehavia apartment) came\".",
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "seeds": {
+    "files": [
+      "asides"
+    ],
+    "k": [
+      1,
+      1
+    ]
+  }
+}

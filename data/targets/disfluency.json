@@ -1,0 +1,34 @@
+{
+  "tag": "disfluency",
+  "created": "2026-10-29",
+  "words": [
+    20,
+    140
+  ],
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "why": "L1.filler-removal, L1.stutter-repetition, L1.false-start-repair: the bulk of everyday clean-up (Daniel, 2026-10-29: \"we should have lots of\").",
+  "n": 40,
+  "seed": 22,
+  "kinds": [
+    "email",
+    "message",
+    "note",
+    "ai_prompt",
+    "calendar"
+  ],
+  "behaviour": "the speaker is disfluent throughout: filler words (um, uh, erm, like, you know, I mean as filler), immediate repetitions (\"the the\", \"in the. In the. In the transcription\"), and abandoned starts restarted straight away (\"The reason I think I'm. I'm underscoring this\"). Use four to seven of these, spread through the text, and also a 'like' or 'you know' that does carry meaning and must stay (\"it looks like rain\", \"you know the one I mean\")",
+  "rule": "Delete fillers (um, uh, erm, and 'like' / 'you know' / 'I mean' when they carry no meaning; keep them when they do), collapse immediate repetitions to one copy, and remove abandoned starts, keeping only the completed version of the clause. Touch nothing else in those sentences.",
+  "seeds": {
+    "files": [
+      "false-starts"
+    ],
+    "k": [
+      1,
+      2
+    ]
+  }
+}

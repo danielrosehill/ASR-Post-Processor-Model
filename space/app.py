@@ -151,8 +151,8 @@ def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
                 + " · ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     if not todo:
         return None, progress
-    # Review queue first (2026-10-29): hist2-* are synthetic pairs (`pairs`) and carried edits to check before training
-    todo = [r for r in todo if r["id"].startswith("hist2-")] or todo
+    # Review queue first (2026-10-29): synthetic pairs (`pairs`, `target`) and carried edits to check before training
+    todo = [r for r in todo if r.get("review")] or todo
     least = min(counts.get(r["use_case"], 0) for r in todo)
     return random.choice([r for r in todo if counts.get(r["use_case"], 0) == least]), progress
 

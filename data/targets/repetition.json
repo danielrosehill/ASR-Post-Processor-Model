@@ -1,0 +1,24 @@
+{
+  "tag": "repetition",
+  "created": "2026-10-29",
+  "words": [
+    20,
+    140
+  ],
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ],
+  "why": "L2.content-repetition: a clause restated in the same breath with nothing added.",
+  "n": 16,
+  "seed": 24,
+  "kinds": [
+    "email",
+    "note",
+    "ai_prompt",
+    "message"
+  ],
+  "behaviour": "the speaker restates one or two points in the same breath with no new information, as people do while thinking aloud (\"I need to pick up a parcel from the post office. I need to pick up a parcel from the post office and I also need to go to the pharmacy.\")",
+  "rule": "Remove a point the speaker restates with no added information, keeping the fullest version once and any new detail the restatement adds."
+}

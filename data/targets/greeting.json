@@ -1,0 +1,22 @@
+{
+  "tag": "greeting",
+  "created": "2026-10-29",
+  "why": "Greeting on its own line, sign-off split across lines, \"Thanks!\" as its own paragraph (fill-email-019, fill-message-010).",
+  "n": 12,
+  "seed": 15,
+  "kinds": [
+    "email",
+    "message"
+  ],
+  "words": [
+    20,
+    140
+  ],
+  "behaviour": "the speaker opens with a greeting (\"Hi Hannah, it's me\") and closes with thanks and a spoken sign-off (\"thanks, yalla, see you\", \"love you, Dan\"), all run into the body",
+  "rule": "Put the greeting on its own line, the body in short paragraphs, a closing thanks as its own paragraph with an exclamation mark (\"Thanks!\"), and the sign-off on its own lines (\"Love you,\" then \"Dan.\").",
+  "features_from": "fill2",
+  "features_per_item": [
+    1,
+    2
+  ]
+}
