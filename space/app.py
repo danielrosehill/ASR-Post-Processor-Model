@@ -83,7 +83,7 @@ def diff_html(a: str, b: str) -> str:
     out = []
     for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=aw, b=bw, autojunk=False).get_opcodes():
         if op in ("delete", "replace"):
-            out.append(f'<del style="color:#b42318">{html.escape(" ".join(aw[i1:i2]))}</del>')
+            out.append(f'<del style="color:#9a3412;text-decoration-color:#ea580c">{html.escape(" ".join(aw[i1:i2]))}</del>')
         if op in ("insert", "replace"):
             out.append(f'<ins style="color:#067647;text-decoration:none;background:#dcfae6">{html.escape(" ".join(bw[j1:j2]))}</ins>')
         if op == "equal":
@@ -115,8 +115,8 @@ def show(item: dict | None, progress: str):
         return None, "", "", "", "Nothing left to annotate.", progress
     terms = f" · keep: {', '.join(item['protect_terms'])}" if item.get("protect_terms") else ""
     meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms}"
-    original = card("Original", f'<div style="white-space:pre-wrap">{html.escape(item["input"])}</div>')
-    s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>")
+    original = card("Original", f'<div style="white-space:pre-wrap">{html.escape(item["input"])}</div>', "original")
+    s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>", "s1")
     return item["id"], original, s1, start(item), meta, progress
 
 
@@ -197,12 +197,14 @@ CSS = """
 .card .label { font-size: 13px; font-weight: 600; color: #475467; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
 .card div, .card { font-size: 18px; line-height: 1.6; }
 .card.small, .card.small div { font-size: 15px; }
-#edit textarea { font-size: 18px !important; line-height: 1.6 !important; }
+#edit textarea { font-size: 18px !important; line-height: 1.6 !important; background: #f3fbf6 !important; border-color: #b7e4c7 !important; }
+.card.original { background: #fdf3f2; border-color: #f4c7c3; }
+.card.s1 { background: #fff7ed; border-color: #fbd5a8; }
 """
 
 
-def card(label: str, body: str) -> str:
-    return f'<div class="card"><div class="label">{label}</div>{body}</div>'
+def card(label: str, body: str, kind: str = "") -> str:
+    return f'<div class="card {kind}"><div class="label">{label}</div>{body}</div>'
 
 
 with gr.Blocks(title="ASR Clean-up Annotator", css=CSS) as demo:
@@ -222,7 +224,7 @@ with gr.Blocks(title="ASR Clean-up Annotator", css=CSS) as demo:
             original = gr.HTML()
             s1 = gr.HTML()
         with gr.Column(scale=1):
-            after = gr.Textbox(label="Your edit", lines=14, max_lines=60, autoscroll=False, elem_id="edit")
+            after = gr.Textbox(label="Your edit", lines=10, max_lines=60, autoscroll=False, elem_id="edit")
             with gr.Row():
                 save_btn = gr.Button("Save & next", variant="primary")
                 same_btn = gr.Button("No change needed")
