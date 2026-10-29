@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["anthropic"]
+# dependencies = ["anthropic", "huggingface_hub"]
 # ///
 """Private before/after pool for the S1-mini clean-up LoRA (decision 0003): raw input, Haiku draft, Daniel's edit.
 
@@ -34,7 +34,9 @@ adapt    Re-drafts the not-yet-annotated items few-shot on Daniel's saved edits,
 edits    Prints Daniel's saved annotations as compact diffs against S1-mini (stdout, JSON lines).
 draft    Haiku's proposed clean-up of every item, under the contract in docs/spec.md with [Layers: 1,2].
          Unchanged input is a valid answer and is expected for clean items. -> data/private/drafts.jsonl
-pool     Leaves out items removed in the Space (removed/<id>.json on the dataset). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
+pool     Leaves out items removed in the Space (removed/<id>.json on the dataset) and items with a spoken edit
+         command (COMMAND: "scratch that"; Daniel 2026-10-29, a separate training task). Writes "11 percent"
+         and "eleven percent" as "11%" in the Haiku and learned drafts (tidy; Daniel's edit). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
          the history items are obfuscated). Annotation is in a private Space.
 
 All Haiku calls go through Message Batches (half price; usually minutes). data/private/ is gitignored
@@ -64,6 +66,9 @@ MODEL = "claude-haiku-5-5"
 DATASET = "danielrosehill/ASR-Cleanup-Before-After"  # public; the Space is private
 SPACE = "danielrosehill/ASR-Cleanup-Annotator"
 CONTROL = "[Layers: 1,2]"
+# Spoken edit commands are a separate training task, not this LoRA's (Daniel, 2026-10-29): items with one are
+# left out of the pool, the adapt examples and synthetic rounds. "ignore that" only as its own clause.
+COMMAND = re.compile(r"\b(scratch that|strike that|ignore what I (just )?said)\b|\bignore that(?=[,.])", re.I)
 KINDS = ["ai_prompt", "email", "calendar", "message", "note", "other"]
 STRATA = [(5, 25, 90), (26, 100, 130), (101, 700, 110)]  # words lo, hi, share of 330
 SENTENCES = "https://huggingface.co/datasets/danielrosehill/Read-Aloud-Voice-Sentences/resolve/main/data/train/metadata.jsonl"
@@ -255,8 +260,8 @@ def adapt(max_words: int, upload: bool) -> None:
     uploads the pool and restarts the Space."""
     recs = annotations()
     done = {r["id"] for r in recs} | removed_ids()
-    edited = [r for r in reversed(recs) if not r["no_change"]]
-    same = [r for r in reversed(recs) if r["no_change"]]
+    edited = [r for r in reversed(recs) if not r["no_change"] and not COMMAND.search(r["input"])]
+    same = [r for r in reversed(recs) if r["no_change"] and not COMMAND.search(r["input"])]
     picked, words = [], 0
     for r in edited[:] + same[: max(1, len(edited) // 4)]:
         w = len(r["input"].split()) + len(r["output"].split())
@@ -268,7 +273,7 @@ def adapt(max_words: int, upload: bool) -> None:
     shots = "\n\n".join(f"<example>\n<input>\n{r['input']}\n</input>\n<output>\n{r['output']}\n</output>\n</example>"
                          for r in picked)
     system = [{"type": "text", "text": ADAPT + shots, "cache_control": {"type": "ephemeral"}}]
-    todo = [it for it in sources() if it["id"] not in done]
+    todo = [it for it in sources() if it["id"] not in done and not COMMAND.search(it["input"])]
     for kind in ("s1", "adapted"):  # is the learned draft cutting his work? saves accepted as they started
         k = [r for r in recs if r.get("start", "s1") == kind]
         if k:
@@ -294,7 +299,7 @@ def edits(last: int) -> None:
     paras = lambda t: len([x for x in re.split(r"\n\s*\n", t or "") if x.strip()])
     toks = lambda t: re.sub(r"\n\s*\n", " ¶ ", t or "").split()
     for r in recs:
-        a, b, out = toks(r["s1"] or r["input"]), toks(r["output"]), []
+        a, b, out = toks(r.get("s1") or r["input"]), toks(r["output"]), []
         for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
             if op in ("delete", "replace"):
                 out.append("[-" + " ".join(a[i1:i2]) + "-]")
@@ -372,6 +377,37 @@ def vocab(n: int) -> None:
     write("vocab.jsonl", rows)
 
 
+UNITS = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
+TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+NUMWORD = r"(?:a hundred|" + "|".join(sorted(UNITS + TENS[2:] + ["hundred"], key=len, reverse=True)) + ")"
+PERCENT = re.compile(rf"\b(\d[\d,]*(?:\.\d+)?|{NUMWORD}(?:[- ]{NUMWORD})*) per ?cent\b", re.I)
+
+
+def words_to_int(w: str) -> int | None:
+    n = 0
+    for t in re.split(r"[- ]", w.lower().replace("a hundred", "one hundred")):
+        if t == "hundred":
+            n = max(n, 1) * 100
+        elif t in UNITS:
+            n += UNITS.index(t)
+        elif t in TENS:
+            n += TENS.index(t) * 10
+        else:
+            return None
+    return n
+
+
+def tidy(t: str | None) -> str | None:
+    """Deterministic fixes Daniel makes by hand, applied to the drafts the edit box starts from:
+    "11 percent" / "eleven percent" -> "11%" (2026-10-29)."""
+    if not t:
+        return t
+    def pct(m: re.Match) -> str:
+        n = m.group(1) if m.group(1)[0].isdigit() else words_to_int(m.group(1))
+        return m.group(0) if n is None else f"{n}%"
+    return PERCENT.sub(pct, t)
+
+
 def draft() -> None:
     items = sources()
     done = {d["id"] for d in read("drafts.jsonl")}
@@ -400,12 +436,13 @@ def pool(upload: bool) -> None:
     rows = []
     for it in sources():
         d = drafts.get(it["id"])
-        if d is None or it["id"] in removed:
+        if d is None or it["id"] in removed or COMMAND.search(it["input"]):
             continue
-        rows.append({**it, "control": CONTROL, "draft": d["draft"], "draft_model": d["draft_model"],
+        a = {k: tidy(v) if k == "adapted" else v for k, v in adapted.get(it["id"], {}).items() if k != "id"}
+        rows.append({**it, "control": CONTROL, "draft": tidy(d["draft"]), "draft_model": d["draft_model"],
                      "draft_unchanged": d["draft"] == it["input"],
                      "s1": s1.get(it["id"], {}).get("s1"), "s1_model": s1.get(it["id"], {}).get("s1_model"),
-                     **{k: v for k, v in adapted.get(it["id"], {}).items() if k != "id"}})
+                     **a})
     write("pool.jsonl", rows)
     by: dict[str, int] = {}
     for r in rows:

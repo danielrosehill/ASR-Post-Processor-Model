@@ -63,9 +63,16 @@ runs on Modal.
 
 ## What the foundation prompt adds to docs/spec.md
 
-Spoken edit commands ("scratch that", "new paragraph"), abandoned sentences, spelled-out words, grammar and
+Spoken edit commands ("new paragraph"; "scratch that" was dropped on 2026-10-29, see below), abandoned sentences, spelled-out words, grammar and
 obvious homophones, "I mean"/"basically" as filler. docs/spec.md and the taxonomy still describe the narrower
 2026-10-16 scope; reconcile them with this record when training starts.
+
+**2026-10-29, Daniel: "scratch that" is out of scope.** Acting on spoken edit commands ("scratch that",
+"ignore what I just said") is a separate training task. `before_after.py pool` leaves out any item whose input
+matches `COMMAND` (72 of 735), `adapt` skips them as examples, and synthetic rounds no longer ask for them.
+Self-corrections without a command ("Thursday, no, Friday") stay in scope. Four saved annotations resolved a
+"scratch that" (`fill-email-019`, `fill-email-043`, `fill-message-023`, `fill2-email-044`); leave them out
+of training with the same `COMMAND` filter.
 
 ## Cost
 
