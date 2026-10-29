@@ -15,7 +15,9 @@ import difflib
 import html
 import json
 import os
+import queue
 import random
+import threading
 from datetime import datetime, timezone
 
 import gradio as gr
@@ -39,9 +41,39 @@ def repo_ids(files: list[str], folder: str, ext: str) -> set[str]:
     return {f[len(folder) + 1:-len(ext)] for f in files if f.startswith(folder + "/") and f.endswith(ext)}
 
 
+# Advancing used to wait for a Hub commit and then a full file listing (several seconds per item). Now
+# the done/removed sets are read once at startup and kept in memory, and commits go through one
+# background worker in order; a failed commit is retried and reported on the next action.
+_files = api.list_repo_files(DATASET, repo_type="dataset")
+DONE, REMOVED = repo_ids(_files, "annotations", ".jsonl"), repo_ids(_files, "removed", ".json")
+UPLOADS: queue.Queue = queue.Queue()
+FAILED: list[str] = []
+
+
+def _uploader():
+    while True:
+        token, path, data, message = UPLOADS.get()
+        for attempt in range(3):
+            try:
+                HfApi(token=token).upload_file(path_or_fileobj=data, path_in_repo=path, repo_id=DATASET,
+                                               repo_type="dataset", commit_message=message)
+                break
+            except Exception as e:  # noqa: BLE001
+                if attempt == 2:
+                    FAILED.append(f"{path}: {e}")
+
+
+threading.Thread(target=_uploader, daemon=True).start()
+
+
+def commit(token: str, path: str, data: bytes, message: str) -> None:
+    UPLOADS.put((token, path, data, message))
+    if FAILED:
+        gr.Warning("Some saves failed and were not written: " + "; ".join(FAILED[-3:]))
+
+
 def done_ids() -> tuple[set[str], set[str]]:
-    files = api.list_repo_files(DATASET, repo_type="dataset")
-    return repo_ids(files, "annotations", ".jsonl"), repo_ids(files, "removed", ".json")
+    return DONE, REMOVED
 
 
 def diff_html(a: str, b: str) -> str:
@@ -115,11 +147,9 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
         "protect_terms": item.get("protect_terms") or [], "words_in": item["words_in"],
         "annotator": profile.username, "annotated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    HfApi(token=oauth_token.token).upload_file(
-        path_or_fileobj=(json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"),
-        path_in_repo=f"annotations/{item_id}.jsonl", repo_id=DATASET, repo_type="dataset",
-        commit_message=f"Annotate {item_id}" + (" (no change)" if record["no_change"] else ""),
-    )
+    DONE.add(item_id)
+    commit(oauth_token.token, f"annotations/{item_id}.jsonl", (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"),
+           f"Annotate {item_id}" + (" (no change)" if record["no_change"] else ""))
     gr.Info(f"Saved {item_id}.")
     return (*show(*pick_next(skipped or [])), skipped, False)
 
@@ -131,10 +161,8 @@ def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr
         raise gr.Error("No item loaded.")
     record = {"id": item_id, "removed_by": profile.username,
               "removed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    HfApi(token=oauth_token.token).upload_file(
-        path_or_fileobj=json.dumps(record).encode("utf-8"), path_in_repo=f"removed/{item_id}.json",
-        repo_id=DATASET, repo_type="dataset", commit_message=f"Remove {item_id} (invalid)",
-    )
+    REMOVED.add(item_id)
+    commit(oauth_token.token, f"removed/{item_id}.json", json.dumps(record).encode("utf-8"), f"Remove {item_id} (invalid)")
     gr.Info(f"Removed {item_id}.")
     return (*show(*pick_next(skipped or [])), skipped)
 
