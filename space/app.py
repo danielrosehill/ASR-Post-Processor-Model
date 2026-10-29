@@ -17,6 +17,7 @@ import json
 import os
 import queue
 import random
+import re
 import threading
 from datetime import datetime, timezone
 
@@ -87,7 +88,7 @@ def diff_html(a: str, b: str) -> str:
             out.append(f'<ins style="color:#067647;text-decoration:none;background:#dcfae6">{html.escape(" ".join(bw[j1:j2]))}</ins>')
         if op == "equal":
             out.append(html.escape(" ".join(aw[i1:i2])))
-    return f'<div style="line-height:1.6;font-size:15px">{" ".join(out)}</div>'
+    return f'<div>{" ".join(out)}</div>'
 
 
 def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
@@ -114,8 +115,8 @@ def show(item: dict | None, progress: str):
         return None, "", "", "", "Nothing left to annotate.", progress
     terms = f" · keep: {', '.join(item['protect_terms'])}" if item.get("protect_terms") else ""
     meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms}"
-    original = f'<div style="line-height:1.6;font-size:15px;white-space:pre-wrap">{html.escape(item["input"])}</div>'
-    s1 = diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output for this item.</em>"
+    original = card("Original", f'<div style="white-space:pre-wrap">{html.escape(item["input"])}</div>')
+    s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>")
     return item["id"], original, s1, start(item), meta, progress
 
 
@@ -135,9 +136,12 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
         raise gr.Error("No item loaded.")
     item = BY_ID[item_id]
     output = item["input"] if no_change else output.strip()
-    missing = [t for t in item.get("protect_terms") or [] if t not in output]
-    if missing and not force:
-        raise gr.Error(f"Protected term missing from the output: {', '.join(missing)}. Tick 'Save anyway' if that's intended.")
+    # Case- and punctuation-insensitive, and a warning only: the first version blocked saves on false
+    # alarms (Daniel, 2026-10-29), e.g. a term that changed case or picked up a hyphen.
+    norm = lambda x: re.sub(r"[^0-9a-z\u0590-\u05ff]+", " ", x.lower()).strip()
+    missing = [t for t in item.get("protect_terms") or [] if f" {norm(t)} " not in f" {norm(output)} "]
+    if missing:
+        gr.Warning(f"Saved, but check: protected term not found in your edit: {', '.join(missing)}")
     record = {
         "id": item_id, "source": item["source"], "use_case": item["use_case"], "control": item["control"],
         "input": item["input"], "s1": item.get("s1"), "s1_model": item.get("s1_model"),
@@ -150,8 +154,21 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
     DONE.add(item_id)
     commit(oauth_token.token, f"annotations/{item_id}.jsonl", (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"),
            f"Annotate {item_id}" + (" (no change)" if record["no_change"] else ""))
-    gr.Info(f"Saved {item_id}.")
-    return (*show(*pick_next(skipped or [])), skipped, False)
+    RECENT.insert(0, record)
+    del RECENT[8:]
+    return (*show(*pick_next(skipped or [])), skipped, False, recent_html())
+
+
+RECENT: list[dict] = []  # this session's saves, newest first
+
+
+def recent_html() -> str:
+    if not RECENT:
+        return "<em>Your saves this session appear here.</em>"
+    rows = "".join(
+        f'<div class="card small"><div class="label">{html.escape(r["id"])} · {html.escape(r["use_case"])}'
+        f'{" · no change" if r["no_change"] else ""}</div>{diff_html(r["input"], r["output"])}</div>' for r in RECENT)
+    return rows
 
 
 def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
@@ -175,40 +192,53 @@ def on_no_change(item_id, output, skipped, force, profile: gr.OAuthProfile | Non
     return save(item_id, output, skipped, force, profile, oauth_token, no_change=True)
 
 
-with gr.Blocks(title="ASR Clean-up Annotator") as demo:
+CSS = """
+.card { border: 1px solid #d0d5dd; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; background: #fcfcfd; }
+.card .label { font-size: 13px; font-weight: 600; color: #475467; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.card div, .card { font-size: 18px; line-height: 1.6; }
+.card.small, .card.small div { font-size: 15px; }
+#edit textarea { font-size: 18px !important; line-height: 1.6 !important; }
+"""
+
+
+def card(label: str, body: str) -> str:
+    return f'<div class="card"><div class="label">{label}</div>{body}</div>'
+
+
+with gr.Blocks(title="ASR Clean-up Annotator", css=CSS) as demo:
     gr.Markdown(
         "# ASR clean-up: before → after\n"
-        "**Original** is the raw transcript; **S1-mini** is stock S1-mini's clean-up with its changes marked; "
-        "**Your edit** starts as S1-mini's text: fix it into the output you want, then **Save & next**. "
-        "**No change needed** saves the original as the answer; **Load Haiku draft** swaps in Haiku's version; "
-        "**Remove (invalid)** drops the item from the dataset. "
+        "Left: the **original** and **S1-mini**'s clean-up (red struck = removed, green = added). Right: **your edit**, "
+        "starting from S1-mini's text. Fix it, then **Save & next**. **No change needed** saves the original as the answer; "
+        "**Remove (invalid)** drops the item. "
         f"Saves go to [`{DATASET}`](https://huggingface.co/datasets/{DATASET})."
     )
     gr.LoginButton()
     item_id, skipped = gr.State(None), gr.State([])
-    meta, progress = gr.Markdown(), gr.Markdown()
-    with gr.Row(equal_height=True):
-        with gr.Column():
-            gr.Markdown("**Original**")
-            original = gr.HTML()
-        with gr.Column():
-            gr.Markdown("**S1-mini** (changes vs original)")
-            s1 = gr.HTML()
-        with gr.Column():
-            after = gr.Textbox(label="Your edit", lines=18, max_lines=60, autoscroll=False)
     with gr.Row():
-        save_btn = gr.Button("Save & next", variant="primary")
-        same_btn = gr.Button("No change needed")
-        reset_btn = gr.Button("Reset to S1-mini")
-        haiku_btn = gr.Button("Load Haiku draft")
-        skip_btn = gr.Button("Skip")
-        remove_btn = gr.Button("Remove (invalid)", variant="stop")
-        force = gr.Checkbox(label="Save anyway (protected term removed on purpose)", value=False)
+        meta, progress = gr.Markdown(), gr.Markdown()
+    with gr.Row():
+        with gr.Column(scale=1):
+            original = gr.HTML()
+            s1 = gr.HTML()
+        with gr.Column(scale=1):
+            after = gr.Textbox(label="Your edit", lines=14, max_lines=60, autoscroll=False, elem_id="edit")
+            with gr.Row():
+                save_btn = gr.Button("Save & next", variant="primary")
+                same_btn = gr.Button("No change needed")
+            with gr.Row():
+                reset_btn = gr.Button("Reset to S1-mini", size="sm")
+                haiku_btn = gr.Button("Load Haiku draft", size="sm")
+                skip_btn = gr.Button("Skip", size="sm")
+                remove_btn = gr.Button("Remove (invalid)", variant="stop", size="sm")
+            force = gr.State(False)
+    gr.Markdown("### Recent saves")
+    recent = gr.HTML(recent_html())
 
     outs = [item_id, original, s1, after, meta, progress]
     demo.load(on_load, [skipped], outs)
-    save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force])
-    same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force])
+    save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force, recent])
+    same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force, recent])
     remove_btn.click(on_remove, [item_id, skipped], outs + [skipped])
     skip_btn.click(on_skip, [item_id, skipped], outs + [skipped])
     reset_btn.click(lambda i: start(BY_ID[i]) if i else "", [item_id], [after])
