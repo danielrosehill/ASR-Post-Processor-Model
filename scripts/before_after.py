@@ -36,7 +36,8 @@ draft    Haiku's proposed clean-up of every item, under the contract in docs/spe
          Unchanged input is a valid answer and is expected for clean items. -> data/private/drafts.jsonl
 pool     Leaves out items removed in the Space (removed/<id>.json on the dataset) and items with a spoken edit
          command (COMMAND: "scratch that"; Daniel 2026-10-29, a separate training task). Writes "11 percent"
-         and "eleven percent" as "11%" in the Haiku and learned drafts (tidy; Daniel's edit). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
+         and "eleven percent" as "11%", and "the 12th of March" / "March the twelfth" as "March 12", in the Haiku
+         and learned drafts (tidy; Daniel's edits). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
          the history items are obfuscated). Annotation is in a private Space.
 
 All Haiku calls go through Message Batches (half price; usually minutes). data/private/ is gitignored
@@ -395,17 +396,45 @@ def words_to_int(w: str) -> int | None:
         else:
             return None
     return n
+MONTH = r"(January|February|March|April|May|June|July|August|September|October|November|December)"
+ORDINALS = ("first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth fourteenth "
+            "fifteenth sixteenth seventeenth eighteenth nineteenth twentieth").split()
+ORDWORD = r"(?:(?:twenty|thirty)[- ](?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)|thirtieth|" + "|".join(
+    sorted(ORDINALS, key=len, reverse=True)) + ")"
+ORD = rf"(\d{{1,2}}(?:st|nd|rd|th)?|{ORDWORD})"
+DATES = [(re.compile(rf"\bthe {ORD} of {MONTH}\b", re.I), 1, 2),  # (pattern, ordinal group, month group)
+         (re.compile(rf"\b{MONTH},? (?:the )?{ORD}\b(?!\s*(?:%|per ?cent|[:.]\d))"), 2, 1)]
+WEEKDAY = re.compile(r"\b((?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day),? (?:the )?(?=" + MONTH + r" \d)")
+
+
+def ordinal_to_int(o: str) -> int | None:
+    o = o.lower()
+    if o[0].isdigit():
+        return int(re.match(r"\d+", o).group(0))
+    *tens, unit = re.split(r"[- ]", o)
+    n = {"twenty": 20, "thirty": 30}.get(tens[0], 0) if tens else 0
+    if unit == "thirtieth":
+        return 30
+    return n + ORDINALS.index(unit) + 1 if unit in ORDINALS else None
 
 
 def tidy(t: str | None) -> str | None:
     """Deterministic fixes Daniel makes by hand, applied to the drafts the edit box starts from:
-    "11 percent" / "eleven percent" -> "11%" (2026-10-29)."""
+    "11 percent" / "eleven percent" -> "11%"; "the 12th of March", "March the twelfth", "March 12th" ->
+    "March 12", "Thursday the 12th of March" -> "Thursday, March 12" (2026-10-29). Dates need a month name;
+    "on the 14th" alone is left as it is."""
     if not t:
         return t
     def pct(m: re.Match) -> str:
         n = m.group(1) if m.group(1)[0].isdigit() else words_to_int(m.group(1))
         return m.group(0) if n is None else f"{n}%"
-    return PERCENT.sub(pct, t)
+    def date(m: re.Match, o: int, mon: int) -> str:
+        n = ordinal_to_int(m.group(o))
+        return m.group(0) if n is None or not 1 <= n <= 31 else f"{m.group(mon).capitalize()} {n}"
+    t = PERCENT.sub(pct, t)
+    for d, o, mon in DATES:
+        t = d.sub(lambda m: date(m, o, mon), t)
+    return WEEKDAY.sub(lambda m: m.group(1) + ", ", t)
 
 
 def draft() -> None:

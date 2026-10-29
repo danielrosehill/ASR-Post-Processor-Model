@@ -74,6 +74,13 @@ Self-corrections without a command ("Thursday, no, Friday") stay in scope. Four 
 "scratch that" (`fill-email-019`, `fill-email-043`, `fill-message-023`, `fill2-email-044`); leave them out
 of training with the same `COMMAND` filter.
 
+**2026-10-29, Daniel: written-form numbers and dates.** Overriding "numbers stay as written" for two cases he
+fixes by hand: percentages as "11%" and dates with a month name as "March 12" (not "the 12th of March",
+"March the 12th" or "March 12th"; "Thursday, March 12" with a weekday). `before_after.py` `tidy` applies them
+deterministically to the Haiku and learned drafts in `pool`, so the saved edits (the training targets) carry
+them. A bare "the 14th" is left alone. Hebrish has no written spec for this yet (B-39 "numbers to digits" is
+still planned, `Hebrish-Dictation/research/post-processing/README.md`); when it lands, align `tidy` with it.
+
 ## Cost
 
 All Haiku calls use Message Batches (half the per-call price).
