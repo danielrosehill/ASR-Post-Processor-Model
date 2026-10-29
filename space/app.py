@@ -7,6 +7,9 @@ S1-mini's output, so the saved edit records where Daniel diverges from S1-mini. 
 "No change needed" saves the raw input unchanged (a counterexample). Each save is committed to the
 dataset as annotations/<id>.jsonl with the signed-in user's OAuth token. The next item comes from the
 use case with the fewest annotations, so the mix stays balanced.
+
+Deploy (restarts the Space, which re-reads pool/pool.jsonl):
+  hf upload danielrosehill/ASR-Cleanup-Annotator space/ . --repo-type space --exclude "__pycache__/*"
 """
 
 from __future__ import annotations
@@ -91,6 +94,48 @@ def diff_html(a: str, b: str) -> str:
     return f'<div>{" ".join(out)}</div>'
 
 
+def copyable(text: str) -> str:
+    """The original as clickable sentences inside paragraphs, for building the edit by copy-paste (Daniel,
+    2026-10-29). Click copies a sentence; shift-click copies from the last clicked sentence to this one (a
+    paragraph-to-be); clicking a paragraph's ¶ copies the whole paragraph. The handlers are COPY_JS."""
+    paras = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
+    out = []
+    for p in paras:
+        sents = [x for x in re.split(r"(?<=[.!?])\s+(?=\S)", p.strip()) if x]
+        spans = " ".join(f'<span class="sent">{html.escape(x)}</span>' for x in sents)
+        out.append(f'<p class="para"><span class="pmark" title="Copy paragraph">¶</span> {spans}</p>')
+    return f'<div class="copyable">{"".join(out)}</div>'
+
+
+COPY_JS = """
+<script>
+(() => {
+  let last = null;
+  const copy = async (text, els) => {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+    els.forEach(el => { el.classList.add('copied'); setTimeout(() => el.classList.remove('copied'), 700); });
+  };
+  document.addEventListener('click', e => {
+    const mark = e.target.closest('.copyable .pmark');
+    if (mark) { const s = [...mark.parentElement.querySelectorAll('.sent')]; copy(s.map(x => x.textContent).join(' '), s); return; }
+    const el = e.target.closest('.copyable .sent');
+    if (!el || window.getSelection().toString()) return;  // a drag-select still copies normally
+    const all = [...el.closest('.copyable').querySelectorAll('.sent')];
+    let pick = [el];
+    if (e.shiftKey && last && all.includes(last)) {
+      const [a, b] = [all.indexOf(last), all.indexOf(el)].sort((x, y) => x - y);
+      pick = all.slice(a, b + 1);
+      window.getSelection().removeAllRanges();
+    }
+    last = el;
+    copy(pick.map(x => x.textContent).join(' '), pick);
+  });
+})();
+</script>
+"""
+
+
 def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
     done, removed = done_ids()
     todo = [r for r in POOL if r["id"] not in done and r["id"] not in removed and r["id"] not in skipped]
@@ -107,15 +152,22 @@ def pick_next(skipped: list[str]) -> tuple[dict | None, str]:
 
 
 def start(item: dict) -> str:
-    return item.get("s1") or item["draft"]
+    """The learned draft (`before_after.py adapt`, few-shot on Daniel's saved edits) when the pool has one, else
+    stock S1-mini (Daniel, 2026-10-29: start closer to his edits so there is less to change)."""
+    return item.get("adapted") or item.get("s1") or item["draft"]
+
+
+def start_kind(item: dict) -> str:
+    return "adapted" if item.get("adapted") else "s1" if item.get("s1") else "draft"
 
 
 def show(item: dict | None, progress: str):
     if item is None:
         return None, "", "", "", "Nothing left to annotate.", progress
     terms = f" · keep: {', '.join(item['protect_terms'])}" if item.get("protect_terms") else ""
-    meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms}"
-    original = card("Original", f'<div style="white-space:pre-wrap">{html.escape(item["input"])}</div>', "original")
+    began = {"adapted": f"learned draft ({item.get('adapt_round')})", "s1": "S1-mini", "draft": "Haiku draft"}[start_kind(item)]
+    meta = f"**{item['id']}** · {item['use_case']} · {item['words_in']} words{terms} · edit starts from {began}"
+    original = card("Original · click a sentence to copy it, shift-click another to copy the run between", copyable(item["input"]), "original")
     s1 = card("S1-mini (changes vs original)", diff_html(item["input"], item["s1"]) if item.get("s1") else "<em>No S1-mini output.</em>", "s1")
     return item["id"], original, s1, start(item), meta, progress
 
@@ -146,7 +198,9 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
         "id": item_id, "source": item["source"], "use_case": item["use_case"], "control": item["control"],
         "input": item["input"], "s1": item.get("s1"), "s1_model": item.get("s1_model"),
         "draft": item["draft"], "draft_model": item["draft_model"], "output": output,
+        "adapted": item.get("adapted"), "adapt_round": item.get("adapt_round"), "start": start_kind(item),
         "edited_vs_s1": output != item.get("s1"), "edited_vs_draft": output != item["draft"],
+        "edited_vs_start": output != start(item),
         "no_change": output == item["input"],
         "protect_terms": item.get("protect_terms") or [], "words_in": item["words_in"],
         "annotator": profile.username, "annotated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -154,21 +208,7 @@ def save(item_id, output, skipped, force, profile, oauth_token, no_change=False)
     DONE.add(item_id)
     commit(oauth_token.token, f"annotations/{item_id}.jsonl", (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"),
            f"Annotate {item_id}" + (" (no change)" if record["no_change"] else ""))
-    RECENT.insert(0, record)
-    del RECENT[8:]
-    return (*show(*pick_next(skipped or [])), skipped, False, recent_html())
-
-
-RECENT: list[dict] = []  # this session's saves, newest first
-
-
-def recent_html() -> str:
-    if not RECENT:
-        return "<em>Your saves this session appear here.</em>"
-    rows = "".join(
-        f'<div class="card small"><div class="label">{html.escape(r["id"])} · {html.escape(r["use_case"])}'
-        f'{" · no change" if r["no_change"] else ""}</div>{diff_html(r["input"], r["output"])}</div>' for r in RECENT)
-    return rows
+    return (*show(*pick_next(skipped or [])), skipped, False)
 
 
 def on_remove(item_id, skipped, profile: gr.OAuthProfile | None, oauth_token: gr.OAuthToken | None):
@@ -196,10 +236,15 @@ CSS = """
 .card { border: 1px solid #d0d5dd; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; background: #fcfcfd; }
 .card .label { font-size: 13px; font-weight: 600; color: #475467; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
 .card div, .card { font-size: 18px; line-height: 1.6; }
-.card.small, .card.small div { font-size: 15px; }
 #edit textarea { font-size: 18px !important; line-height: 1.6 !important; background: #f3fbf6 !important; border-color: #b7e4c7 !important; }
 .card.original { background: #fdf3f2; border-color: #f4c7c3; }
 .card.s1 { background: #fff7ed; border-color: #fbd5a8; }
+.copyable .para { margin: 0 0 10px; }
+.copyable .sent { cursor: copy; border-radius: 4px; padding: 1px 2px; transition: background .2s; }
+.copyable .sent:hover { background: #fde2df; }
+.copyable .sent.copied { background: #b7e4c7; }
+.copyable .pmark { cursor: copy; color: #b42318; opacity: .45; font-weight: 600; margin-right: 2px; }
+.copyable .pmark:hover { opacity: 1; }
 """
 
 
@@ -207,12 +252,12 @@ def card(label: str, body: str, kind: str = "") -> str:
     return f'<div class="card {kind}"><div class="label">{label}</div>{body}</div>'
 
 
-with gr.Blocks(title="ASR Clean-up Annotator", css=CSS) as demo:
+with gr.Blocks(title="ASR Clean-up Annotator", css=CSS, head=COPY_JS) as demo:
     gr.Markdown(
         "# ASR clean-up: before → after\n"
         "Left: the **original** and **S1-mini**'s clean-up (red struck = removed, green = added). Right: **your edit**, "
-        "starting from S1-mini's text. Fix it, then **Save & next**. **No change needed** saves the original as the answer; "
-        "**Remove (invalid)** drops the item. "
+        "starting from the learned draft (re-drafted from your earlier edits) or, without one, S1-mini's text. Fix it, then **Save & next**. **No change needed** saves the original as the answer; "
+        "**Remove (invalid)** drops the item. Click a sentence of the original to copy it (shift-click a second one for the run between). "
         f"Saves go to [`{DATASET}`](https://huggingface.co/datasets/{DATASET})."
     )
     gr.LoginButton()
@@ -230,21 +275,21 @@ with gr.Blocks(title="ASR Clean-up Annotator", css=CSS) as demo:
                 same_btn = gr.Button("No change needed")
             with gr.Row():
                 reset_btn = gr.Button("Reset to S1-mini", size="sm")
+                learned_btn = gr.Button("Learned draft", size="sm")
                 haiku_btn = gr.Button("Load Haiku draft", size="sm")
                 skip_btn = gr.Button("Skip", size="sm")
                 remove_btn = gr.Button("Remove (invalid)", variant="stop", size="sm")
             force = gr.State(False)
-    gr.Markdown("### Recent saves")
-    recent = gr.HTML(recent_html())
 
     outs = [item_id, original, s1, after, meta, progress]
     demo.load(on_load, [skipped], outs)
-    save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force, recent])
-    same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force, recent])
+    save_btn.click(on_save, [item_id, after, skipped, force], outs + [skipped, force])
+    same_btn.click(on_no_change, [item_id, after, skipped, force], outs + [skipped, force])
     remove_btn.click(on_remove, [item_id, skipped], outs + [skipped])
     skip_btn.click(on_skip, [item_id, skipped], outs + [skipped])
-    reset_btn.click(lambda i: start(BY_ID[i]) if i else "", [item_id], [after])
+    reset_btn.click(lambda i: (BY_ID[i].get("s1") or BY_ID[i]["draft"]) if i else "", [item_id], [after])
     haiku_btn.click(lambda i: BY_ID[i]["draft"] if i else "", [item_id], [after])
+    learned_btn.click(lambda i: start(BY_ID[i]) if i else "", [item_id], [after])
 
 if __name__ == "__main__":
     demo.launch()

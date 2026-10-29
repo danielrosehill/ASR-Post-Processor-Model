@@ -32,6 +32,12 @@ broad scope of his baseline edits.
    Haiku draft is one button away. The next item is from the least-annotated use case. Saves go to
    the public dataset `danielrosehill/ASR-Cleanup-Before-After` (`annotations/<id>.jsonl`), under Daniel's
    account, not an organisation.
+   Amended 2026-10-29 (Daniel: "improve as we go along, so I've less to annotate"): the edit box now starts
+   from a **learned draft** when the pool has one, Haiku re-drafting each unannotated item few-shot on his saved
+   edits (`before_after.py adapt`, rerun every ~25 annotations). Each save records `start` and the `adapted`
+   text, so where he diverges from S1-mini is still recoverable (`s1` and `output` are both in the record),
+   and `edited_vs_start` shows whether the learned draft is cutting his work. Cost of the change: his edits
+   may lean towards Haiku's phrasing where he would not have bothered to change S1-mini's.
 4. **Target:** about 300 edits, about 40 held out as the test set. Train at 100 to see the learning curve;
    continue only if it is still improving. Stock S1-mini runs on the same inputs on Modal as the baseline.
 5. **Control line:** every item is `[Layers: 1,2]`; Layer-1-only targets are not made.

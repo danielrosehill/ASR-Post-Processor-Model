@@ -1,0 +1,144 @@
+{
+ "tag": "fill2",
+ "created": "2026-10-29",
+ "seed": 3,
+ "why": "After Daniel's first 7 edits (S1-Mini-Cleanup-Finetune notes/annotation-patterns.md): what his edits do and stock S1-mini doesn't.",
+ "plan": [
+  {
+   "kind": "email",
+   "count": 50,
+   "words": [
+    80,
+    300
+   ]
+  },
+  {
+   "kind": "message",
+   "count": 40,
+   "words": [
+    15,
+    90
+   ]
+  },
+  {
+   "kind": "calendar",
+   "count": 30,
+   "words": [
+    12,
+    70
+   ]
+  },
+  {
+   "kind": "ai_prompt",
+   "count": 40,
+   "words": [
+    40,
+    250
+   ]
+  },
+  {
+   "kind": "note",
+   "count": 20,
+   "words": [
+    40,
+    200
+   ]
+  },
+  {
+   "kind": "note",
+   "count": 20,
+   "words": [
+    300,
+    500
+   ]
+  }
+ ],
+ "kind_desc": {
+  "ai_prompt": "a prompt being dictated to an AI assistant",
+  "note": "a note to himself being dictated"
+ },
+ "scenes": {
+  "email": [
+   "to his wife Hannah about a household matter",
+   "to a landlord about a repair",
+   "to a colleague about a project",
+   "to a client after a first meeting",
+   "to a doctor's office to reschedule",
+   "to the city about arnona",
+   "to a school about a child's schedule",
+   "to a supplier about an order",
+   "to a friend overseas",
+   "to a new client after a call",
+   "to a recruiter",
+   "to a vet clinic",
+   "to an accountant about taxes",
+   "to a conference organiser",
+   "to his parents abroad",
+   "to a software vendor's support"
+  ],
+  "message": [
+   "a WhatsApp to Hannah",
+   "a text to a friend",
+   "a message to a group chat",
+   "a reply to a colleague on Slack",
+   "a message to a delivery driver",
+   "a text to a neighbour",
+   "a WhatsApp to a plumber",
+   "a message to the building committee (vaad bayit)",
+   "a reply to a friend's invitation",
+   "a text to Hannah with three quick things"
+  ],
+  "calendar": [
+   "a dentist appointment",
+   "a call with a client",
+   "a reminder to pay a bill",
+   "a family dinner",
+   "a car service",
+   "a deadline",
+   "a flight",
+   "a recurring weekly meeting",
+   "a kupat holim appointment",
+   "two related appointments in one go",
+   "a reminder with a deadline that changes mid-sentence",
+   "a pickup from gan",
+   "a call with someone whose name he spells out"
+  ],
+  "ai_prompt": [
+   "a prompt to Claude Code about a bug in a web app",
+   "a prompt asking an AI to research a purchase",
+   "a prompt to an agent to reorganise files on a server",
+   "a prompt to draft a blog post outline",
+   "a prompt asking for a shell script",
+   "a prompt asking an AI to compare two speech models",
+   "a prompt to an agent to set up a Home Assistant automation",
+   "a follow-up correcting what an AI just did"
+  ],
+  "note": [
+   "a to-do brain dump for the day",
+   "notes on a meeting just finished",
+   "ideas for a side project",
+   "a journal entry about the week",
+   "a plan for a home office upgrade",
+   "thoughts on training a speech model"
+  ]
+ },
+ "features": [
+  "a greeting at the start and a spoken sign-off at the end",
+  "an aside that clarifies something in passing (\"the one for the Rehavia apartment\", \"just so it doesn't time out\")",
+  "a self-correction that changes a date, time or amount twice before settling",
+  "a name or word spelled out letter by letter for the transcriber",
+  "\"scratch that\" followed by a replacement",
+  "several separate requests or items run together in one sentence",
+  "a long run-on sentence joined with \"and\" and \"so\"",
+  "an immediate repeated word or phrase (\"the, the\")",
+  "a false start that is restarted",
+  "a word aside to someone else in the room (\"one sec, Noa, put that down\")",
+  "\"where was I\" or a similar recovery phrase",
+  "a thank-you said in passing in the middle"
+ ],
+ "features_per_item": [
+  2,
+  4
+ ],
+ "clean_every": 5
+}

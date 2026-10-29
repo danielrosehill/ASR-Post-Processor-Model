@@ -7,6 +7,9 @@
   with-secrets uv run scripts/before_after.py history [--n 330] [--db ~/.local/share/hebrish/history.db]
   with-secrets uv run scripts/before_after.py vocab [--n 100]
   with-secrets uv run scripts/before_after.py fill
+  with-secrets uv run scripts/before_after.py synth <tag>     # spec data/synth/<tag>.json, e.g. fill2
+  with-secrets uv run scripts/before_after.py adapt [--words 12000] [--upload]   # after every ~25 new annotations
+  uv run scripts/before_after.py edits [--last N]            # Daniel's saved edits vs S1-mini, compact
   with-secrets uv run scripts/before_after.py draft
   with-secrets uv run scripts/before_after.py pool [--upload]
 
@@ -22,6 +25,13 @@ vocab    Code-switching and tech sentences from the train split of danielrosehil
 fill     Daniel's history has no emails or calendar entries and few messages (2026-10-29: of 330 sampled,
          232 ai_prompt, 54 note, 31 other, 13 message), so Haiku writes FILL dictations in the raw ASR
          register, a fifth of them clean (counterexamples). -> data/private/fill.jsonl
+synth    A synthetic round aimed at Daniel's edits, from a spec in data/synth/<tag>.json (kinds, counts, lengths,
+         scenes, artifacts to sample per item, clean share). fill2 (2026-10-29, 200 items, after his first 7
+         edits) was the first. -> data/private/<tag>.jsonl. Rounds are planned with the model-training-ops
+         skill `asr-cleanup-synth-round`, which reads `edits` first.
+adapt    Re-drafts the not-yet-annotated items few-shot on Daniel's saved edits, so the annotator starts from a
+         draft shaped his way; rerun as annotations grow. -> data/private/adapted.jsonl ([--words N] [--upload])
+edits    Prints Daniel's saved annotations as compact diffs against S1-mini (stdout, JSON lines).
 draft    Haiku's proposed clean-up of every item, under the contract in docs/spec.md with [Layers: 1,2].
          Unchanged input is a valid answer and is expected for clean items. -> data/private/drafts.jsonl
 pool     Leaves out items removed in the Space (removed/<id>.json on the dataset). Joins them (and stock S1-mini's output from scripts/s1_modal.py, field `s1`) into data/private/pool.jsonl and uploads it to DATASET (public, Daniel 2026-10-29;
@@ -49,8 +59,10 @@ import anthropic
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVATE = ROOT / "data" / "private"
+SYNTH = ROOT / "data" / "synth"  # synthetic round specs (public; the outputs stay in data/private)
 MODEL = "claude-haiku-5-5"
 DATASET = "danielrosehill/ASR-Cleanup-Before-After"  # public; the Space is private
+SPACE = "danielrosehill/ASR-Cleanup-Annotator"
 CONTROL = "[Layers: 1,2]"
 KINDS = ["ai_prompt", "email", "calendar", "message", "note", "other"]
 STRATA = [(5, 25, 90), (26, 100, 130), (101, 700, 110)]  # words lo, hi, share of 330
@@ -186,6 +198,116 @@ def fill() -> None:
     write("fill.jsonl", rows)
 
 
+def synth(path: Path) -> None:
+    """A synthetic round from a spec in data/synth/<tag>.json (written by the model-training-ops skill
+    `asr-cleanup-synth-round` from Daniel's annotations): plan of kinds, counts and lengths; scenes per kind;
+    the dictation artifacts to sample, `features_per_item` of them per item; every `clean_every`-th item clean.
+    Same seed and spec give the same jobs, so a rerun reuses the batch in the ledger."""
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    tag, (fmin, fmax) = spec["tag"], spec["features_per_item"]
+    rng, jobs, meta, n = random.Random(spec["seed"]), [], {}, 0
+    kind_desc = {**KIND_DESC, **spec.get("kind_desc", {})}
+    for p in spec["plan"]:
+        kind, (lo, hi) = p["kind"], p["words"]
+        for i in range(p["count"]):
+            cid = f"{tag}-{kind}-{n:03d}"
+            n += 1
+            clean = i % spec["clean_every"] == 0
+            feats = rng.sample(spec["features"], rng.randint(fmin, fmax))
+            mess = CLEAN if clean else ("Include these artifacts of real dictation: " + "; ".join(feats) + ".")
+            jobs.append((cid, "You write realistic raw dictation transcripts.", FILL_PROMPT.format(
+                kind_desc=kind_desc[kind], scene=rng.choice(spec["scenes"][kind]), lo=lo, hi=hi, mess=mess)))
+            meta[cid] = (kind, clean, [] if clean else feats)
+    res = batch(client(), jobs, tag)
+    rows = [{"id": cid, "source": "synthetic-clean" if meta[cid][1] else "synthetic-raw", "use_case": meta[cid][0],
+             "features": meta[cid][2], "input": re.sub(r"\s+", " ", t).strip(), "protect_terms": [],
+             "words_in": len(t.split())} for cid, t in sorted(res.items()) if t]
+    write(f"{tag}.jsonl", rows)
+
+
+def sources() -> list[dict]:
+    """Every pool item: history, vocab and the synthetic rounds (fill.jsonl, then data/synth/<tag>.json order)."""
+    return [r for f in ["history.jsonl", "vocab.jsonl", "fill.jsonl"] + [f"{p.stem}.jsonl" for p in sorted(SYNTH.glob("*.json"))]
+            for r in read(f)]
+
+
+def annotations() -> list[dict]:
+    """Every saved annotation on the dataset, oldest first."""
+    from huggingface_hub import snapshot_download
+    d = Path(snapshot_download(DATASET, repo_type="dataset", allow_patterns=["annotations/*.jsonl"]))
+    return sorted((json.loads(l) for f in (d / "annotations").glob("*.jsonl") for l in f.read_text().splitlines() if l.strip()),
+                  key=lambda r: r["annotated_at"])
+
+
+ADAPT = DRAFT + """
+
+The target is how Daniel himself edits his dictations. Below are his own edits: each <example> has the raw <input> and his <output>. Where they differ from the rules above (paragraphing, how far he resolves self-corrections, what he keeps, his punctuation), follow the examples, not the rules. Where an example leaves the input unchanged, that is a valid answer too.
+
+"""
+
+
+def adapt(max_words: int, upload: bool) -> None:
+    """Re-draft every pool item not yet annotated or removed, few-shot on Daniel's saved edits, so the
+    annotator's edit box starts closer to what he wants (Daniel, 2026-10-29: "improve as we go along").
+    Rerun every ~25 new annotations; each run is a new batch (tag adapt-<n annotations>) and replaces
+    data/private/adapted.jsonl. Examples: newest first, edits before no-change ones (at most a fifth), up to
+    max_words of input+output; the system prompt is cached across the batch. --upload also rebuilds and
+    uploads the pool and restarts the Space."""
+    recs = annotations()
+    done = {r["id"] for r in recs} | removed_ids()
+    edited = [r for r in reversed(recs) if not r["no_change"]]
+    same = [r for r in reversed(recs) if r["no_change"]]
+    picked, words = [], 0
+    for r in edited[:] + same[: max(1, len(edited) // 4)]:
+        w = len(r["input"].split()) + len(r["output"].split())
+        if words + w > max_words:
+            continue
+        picked.append(r)
+        words += w
+    random.Random(len(recs)).shuffle(picked)
+    shots = "\n\n".join(f"<example>\n<input>\n{r['input']}\n</input>\n<output>\n{r['output']}\n</output>\n</example>"
+                         for r in picked)
+    system = [{"type": "text", "text": ADAPT + shots, "cache_control": {"type": "ephemeral"}}]
+    todo = [it for it in sources() if it["id"] not in done]
+    for kind in ("s1", "adapted"):  # is the learned draft cutting his work? saves accepted as they started
+        k = [r for r in recs if r.get("start", "s1") == kind]
+        if k:
+            print(f"started from {kind}: {sum(not r.get('edited_vs_start', r['output'] != r.get('s1')) for r in k)}/{len(k)} saved unchanged")
+    print(f"{len(recs)} annotations, {len(picked)} as examples ({words} words); re-drafting {len(todo)} items")
+    tag = f"adapt-{len(recs)}"
+    res = batch(client(), [(it["id"], system, wrap(it["input"])) for it in todo], tag)
+    write("adapted.jsonl", [{"id": i, "adapted": t, "adapt_model": MODEL, "adapt_round": tag, "adapt_examples": len(picked)}
+                            for i, t in res.items() if t])
+    if upload:
+        pool(True)
+        from huggingface_hub import HfApi
+        HfApi(token=os.environ.get("HF_TOKEN")).restart_space(SPACE)
+        print(f"restarted {SPACE}")
+
+
+def edits(last: int) -> None:
+    """Daniel's saved annotations, compactly, for reading his edit patterns: per item the use case, paragraph
+    counts (input / S1-mini / his edit) and a word diff of his edit against S1-mini ([-removed-] {+added+},
+    a paragraph break shown as ¶). Newest last; --last N keeps the N newest."""
+    import difflib
+    recs = annotations()[-last:]
+    paras = lambda t: len([x for x in re.split(r"\n\s*\n", t or "") if x.strip()])
+    toks = lambda t: re.sub(r"\n\s*\n", " ¶ ", t or "").split()
+    for r in recs:
+        a, b, out = toks(r["s1"] or r["input"]), toks(r["output"]), []
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+            if op in ("delete", "replace"):
+                out.append("[-" + " ".join(a[i1:i2]) + "-]")
+            if op in ("insert", "replace"):
+                out.append("{+" + " ".join(b[j1:j2]) + "+}")
+            if op == "equal":
+                out.append(" ".join(a[i1:i2]) if i2 - i1 <= 6 else f"{' '.join(a[i1:i1 + 3])} … {' '.join(a[i2 - 3:i2])}")
+        print(json.dumps({"id": r["id"], "use_case": r["use_case"], "words": r["words_in"], "no_change": r["no_change"],
+                          "same_as_s1": r["output"] == r.get("s1"),
+                          "start": r.get("start", "s1"), "same_as_start": not r.get("edited_vs_start", r["output"] != r.get("s1")), "paragraphs": [paras(r["input"]), paras(r["s1"]), paras(r["output"])],
+                          "diff_vs_s1": " ".join(out)}, ensure_ascii=False))
+
+
 def history(n: int, db: Path) -> None:
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     rows = con.execute("SELECT text, words FROM dictations WHERE source = 'dictate' AND words BETWEEN 5 AND 700").fetchall()
@@ -251,7 +373,7 @@ def vocab(n: int) -> None:
 
 
 def draft() -> None:
-    items = read("history.jsonl") + read("vocab.jsonl") + read("fill.jsonl")
+    items = sources()
     done = {d["id"] for d in read("drafts.jsonl")}
     todo = [it for it in items if it["id"] not in done]
     res = batch(client(), [(it["id"], DRAFT, wrap(it["input"])) for it in todo], "draft")
@@ -272,16 +394,18 @@ def removed_ids() -> set[str]:
 
 def pool(upload: bool) -> None:
     drafts = {d["id"]: d for d in read("drafts.jsonl")}
-    s1 = {d["id"]: d for d in read("s1.jsonl")}  # scripts/s1_modal.py; the annotator starts from it
+    s1 = {d["id"]: d for d in read("s1.jsonl")}  # scripts/s1_modal.py
+    adapted = {d["id"]: d for d in read("adapted.jsonl")}  # `adapt`; the annotator starts from it when present
     removed = removed_ids()  # marked invalid in the Space (removed/<id>.json)
     rows = []
-    for it in read("history.jsonl") + read("vocab.jsonl") + read("fill.jsonl"):
+    for it in sources():
         d = drafts.get(it["id"])
         if d is None or it["id"] in removed:
             continue
         rows.append({**it, "control": CONTROL, "draft": d["draft"], "draft_model": d["draft_model"],
                      "draft_unchanged": d["draft"] == it["input"],
-                     "s1": s1.get(it["id"], {}).get("s1"), "s1_model": s1.get(it["id"], {}).get("s1_model")})
+                     "s1": s1.get(it["id"], {}).get("s1"), "s1_model": s1.get(it["id"], {}).get("s1_model"),
+                     **{k: v for k, v in adapted.get(it["id"], {}).items() if k != "id"}})
     write("pool.jsonl", rows)
     by: dict[str, int] = {}
     for r in rows:
@@ -303,6 +427,12 @@ if __name__ == "__main__":
         vocab(int(args.get("--n", 100)))
     elif cmd == "fill":
         fill()
+    elif cmd == "synth":
+        synth(SYNTH / f"{sys.argv[2]}.json")
+    elif cmd == "adapt":
+        adapt(int(args.get("--words", 12000)), "--upload" in sys.argv)
+    elif cmd == "edits":
+        edits(int(args.get("--last", 10_000)))
     elif cmd == "draft":
         draft()
     elif cmd == "pool":
