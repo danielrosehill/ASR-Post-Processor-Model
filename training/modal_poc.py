@@ -3,6 +3,7 @@
 
   with-secrets uv run --with anthropic --with huggingface_hub python training/modal_poc.py data   # -> data/private/poc/
   MODAL_PROFILE=danielrosehill uv run --with modal modal run training/modal_poc.py              # train + held-out infer
+  MODAL_PROFILE=danielrosehill uv run --with modal modal run training/modal_poc.py --control    # same on plain Qwen3-0.6B -> lora-qwen.jsonl
 
 data   Pairs from the saved annotations (scripts/before_after.py `annotations`): items with a spoken edit command
        (COMMAND) and the old hist-* items (replaced by their rewrites, `rewrite`) are left out; the 21 hist2-* items
@@ -61,15 +62,16 @@ image = (modal.Image.debian_slim(python_version="3.12")
 
 
 @app.function(image=image, gpu=["L4", "A10G"], timeout=3600)
-def run(train: str, test: str) -> dict:
+def run(train: str, test: str, control: bool = False) -> dict:
     import subprocess
     Path("/tmp/train.jsonl").write_text(train)
     Path("/tmp/test.jsonl").write_text(test)
     py = ["python", "/root/s1mini_lora.py"]
+    cb = ["--control-base"] if control else []  # Daniel, 2026-10-29: is S1-mini worth it over its own base?
     subprocess.run(py + ["train", "--data", "/tmp/train.jsonl", "--output-dir", "/tmp/adapter", "--epochs", "4",
-                         "--batch-size", "4", "--grad-accum", "1", "--lr", "2e-4"], check=True)
-    subprocess.run(py + ["infer", "--data", "/tmp/test.jsonl", "--layers", "none", "--out", "/tmp/base.jsonl"], check=True)
-    subprocess.run(py + ["infer", "--data", "/tmp/test.jsonl", "--adapter", "/tmp/adapter", "--out", "/tmp/lora.jsonl"], check=True)
+                         "--batch-size", "4", "--grad-accum", "1", "--lr", "2e-4"] + cb, check=True)
+    subprocess.run(py + ["infer", "--data", "/tmp/test.jsonl", "--layers", "none", "--out", "/tmp/base.jsonl"] + cb, check=True)
+    subprocess.run(py + ["infer", "--data", "/tmp/test.jsonl", "--adapter", "/tmp/adapter", "--out", "/tmp/lora.jsonl"] + cb, check=True)
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         t.add("/tmp/adapter", arcname="adapter")
@@ -77,9 +79,14 @@ def run(train: str, test: str) -> dict:
 
 
 @app.local_entrypoint()
-def main():
-    res = run.remote((POC / "train.jsonl").read_text(), (POC / "test.jsonl").read_text())
-    (POC / "base.jsonl").write_text(res["base"])
-    (POC / "lora.jsonl").write_text(res["lora"])
-    tarfile.open(fileobj=io.BytesIO(res["adapter"]), mode="r:gz").extractall(POC)
-    print(f"wrote {POC}/base.jsonl, lora.jsonl, adapter/")
+def main(control: bool = False):
+    res = run.remote((POC / "train.jsonl").read_text(), (POC / "test.jsonl").read_text(), control)
+    sfx = "-qwen" if control else ""
+    (POC / f"base{sfx}.jsonl").write_text(res["base"])
+    (POC / f"lora{sfx}.jsonl").write_text(res["lora"])
+    out = POC / f"adapter{sfx}"
+    with tarfile.open(fileobj=io.BytesIO(res["adapter"]), mode="r:gz") as t:
+        for m in t.getmembers():
+            m.name = m.name.replace("adapter", out.name, 1)
+            t.extract(m, POC, filter="data")
+    print(f"wrote {POC}/base{sfx}.jsonl, lora{sfx}.jsonl, {out.name}/")
