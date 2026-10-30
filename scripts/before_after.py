@@ -92,7 +92,10 @@ CONTROL = "[Layers: 1,2]"
 COMMAND = re.compile(r"\b(scratch that|strike that|ignore what I (just )?said)\b|\bignore that(?=[,.])", re.I)
 KINDS = ["ai_prompt", "email", "calendar", "message", "note", "other"]
 STRATA = [(5, 25, 90), (26, 100, 130), (101, 700, 110)]  # words lo, hi, share of 330
-SENTENCES = "https://huggingface.co/datasets/danielrosehill/Read-Aloud-Voice-Sentences/resolve/main/data/train/metadata.jsonl"
+# Train-split metadata of the corpus: the Parquet index meta/train.jsonl (dataset converted 2026-10-30), else the
+# audiofolder's data/train/metadata.jsonl. Same rows either way.
+SENTENCES = ["https://huggingface.co/datasets/danielrosehill/Read-Aloud-Voice-Sentences/resolve/main/meta/train.jsonl",
+             "https://huggingface.co/datasets/danielrosehill/Read-Aloud-Voice-Sentences/resolve/main/data/train/metadata.jsonl"]
 
 OBFUSCATE = """You prepare a real voice-dictation transcript for use as private training data for a transcript clean-up model.
 
@@ -632,9 +635,15 @@ def history(n: int, db: Path) -> None:
 
 
 def vocab(n: int) -> None:
-    req = urllib.request.Request(SENTENCES, headers={"Authorization": f"Bearer {os.environ.get('HF_TOKEN', '')}"})
-    with urllib.request.urlopen(req, timeout=120) as r:  # 401 without a token (2026-10-29)
-        recs = [json.loads(l) for l in r.read().decode("utf-8").splitlines() if l.strip()]
+    for url in SENTENCES:
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {os.environ.get('HF_TOKEN', '')}"})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:  # 401 without a token (2026-10-29)
+                recs = [json.loads(l) for l in r.read().decode("utf-8").splitlines() if l.strip()]
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 404 or url == SENTENCES[-1]:
+                raise
     rng = random.Random(1)
     cs = [r for r in recs if "code_switch" in (r.get("categories") or []) and r.get("target_terms")]
     tech = [r for r in recs if "tech" in (r.get("categories") or []) and "code_switch" not in r["categories"] and r.get("target_terms")]
