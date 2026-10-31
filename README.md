@@ -66,6 +66,8 @@ Full list with examples: [`taxonomy/transformations.json`](taxonomy/transformati
 
 ## Related work
 
+- [Dictation-Format-Adapters](https://github.com/danielrosehill/Dictation-Format-Adapters) (2026-10-31): layer 3 as a
+  bounded catalogue of LoRA format adapters (shopping list, emails, blog outline, calendar JSON) on top of S1-ASR-Cleanup.
 - [ASR-Paragraph-Breaks](https://github.com/danielrosehill/ASR-Paragraph-Breaks) (2026-10-21):
   `L1.paragraph-boundaries` spun out as its own hand-annotated dataset and paragraph-only model.
 - [ASR-Regex-Post-Processing](https://github.com/danielrosehill/ASR-Regex-Post-Processing): Android-safe
